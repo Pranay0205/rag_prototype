@@ -75,9 +75,7 @@ def load_structured(conn, report: dict) -> None:
                 values[cols.index("classification")] = "internal"
             if extra:
                 values.append(rec["client_id"])
-            conn.execute(
-                f'INSERT INTO "{table}" VALUES ({", ".join("?" * len(values))})', values
-            )
+            conn.execute(f'INSERT INTO "{table}" VALUES ({", ".join("?" * len(values))})', values)
         counts[table] = len(records)
     report["tables"] = counts
 
@@ -104,26 +102,49 @@ def merge_clients(conn, report: dict) -> dict[str, str]:
         for m in members[1:]:
             sid, mid = survivor["client_id"], m["client_id"]
             merge_map[mid] = sid
-            evidence = {"lei": lei, "survivor_created": survivor["created_date"], "merged_created": m["created_date"],
-                        "merged_legal_name": m["legal_name"], "merged_industry": m["industry"]}
-            conn.execute("INSERT INTO client_merge VALUES (?,?,?,?)",
-                         (mid, sid, "same LEI; survivor = earliest created_date", json.dumps(evidence)))
+            evidence = {
+                "lei": lei,
+                "survivor_created": survivor["created_date"],
+                "merged_created": m["created_date"],
+                "merged_legal_name": m["legal_name"],
+                "merged_industry": m["industry"],
+            }
+            conn.execute(
+                "INSERT INTO client_merge VALUES (?,?,?,?)",
+                (mid, sid, "same LEI; survivor = earliest created_date", json.dumps(evidence)),
+            )
             for t in client_tables:
                 conn.execute(f'UPDATE "{t}" SET client_id=? WHERE client_id=?', (sid, mid))
             for name in {m["legal_name"], m["short_name"]}:
-                conn.execute("INSERT INTO client_aliases (alias, client_id, source) VALUES (?,?,?)",
-                             (name, sid, f"merge:{mid}"))
+                conn.execute(
+                    "INSERT INTO client_aliases (alias, client_id, source) VALUES (?,?,?)",
+                    (name, sid, f"merge:{mid}"),
+                )
             conn.execute("DELETE FROM clients WHERE client_id=?", (mid,))
 
     # Rows that became exact duplicates after the rewrite (e.g. coverage C-007/alex -> C-002/alex)
-    conn.execute("DELETE FROM coverage WHERE rowid NOT IN (SELECT MIN(rowid) FROM coverage GROUP BY client_id, user_id)")
-    conn.execute("DELETE FROM client_aliases WHERE rowid NOT IN (SELECT MIN(rowid) FROM client_aliases GROUP BY lower(alias), client_id)")
+    conn.execute(
+        """
+        DELETE FROM coverage
+        WHERE rowid NOT IN (SELECT MIN(rowid) FROM coverage GROUP BY client_id, user_id)
+        """
+    )
+    conn.execute(
+        """
+        DELETE FROM client_aliases
+        WHERE rowid NOT IN (SELECT MIN(rowid) FROM client_aliases GROUP BY lower(alias), client_id)
+        """
+    )
     # Same person recorded under both records: keep the survivor's contact
-    dup_contacts = [dict(r) for r in conn.execute(
-        """SELECT c.contact_id, c.name, c.source_client_id FROM contacts c
+    dup_contacts = [
+        dict(r)
+        for r in conn.execute(
+            """SELECT c.contact_id, c.name, c.source_client_id FROM contacts c
            WHERE c.source_client_id != c.client_id AND EXISTS (
              SELECT 1 FROM contacts s WHERE s.client_id = c.client_id
-               AND lower(s.name) = lower(c.name) AND s.source_client_id = s.client_id)""")]
+               AND lower(s.name) = lower(c.name) AND s.source_client_id = s.client_id)"""
+        )
+    ]
     for d in dup_contacts:
         conn.execute("DELETE FROM contacts WHERE contact_id=?", (d["contact_id"],))
 
@@ -180,7 +201,11 @@ def _link(meta: dict, body: str, resolver: EntityResolver, merge_map: dict) -> t
 
 
 def _normalized_body(body: str) -> str:
-    lines = [ln for ln in body.splitlines() if not HEADER_LINE.match(ln.strip()) and not FORWARD_MARKER.match(ln.strip())]
+    lines = [
+        ln
+        for ln in body.splitlines()
+        if not HEADER_LINE.match(ln.strip()) and not FORWARD_MARKER.match(ln.strip())
+    ]
     return re.sub(r"\s+", " ", " ".join(lines).lower()).strip()
 
 
@@ -227,23 +252,31 @@ def load_documents(conn, resolver: EntityResolver, merge_map: dict, report: dict
     for path in sorted(config.DOCS_DIR.glob("*.md")):
         meta, body = _read_doc(path)
         cid, method, conf = _link(meta, body, resolver, merge_map)
-        docs.append({
-            "doc_id": meta["doc_id"], "doc_type": meta["doc_type"], "title": meta["title"],
-            "date": meta["date"], "author": meta.get("author"), "client_id": cid,
-            "source_client_id": meta.get("client_id"), "link_method": method, "link_confidence": conf,
-            "mentions": json.dumps(meta.get("mentions") or []),
-            "classification": meta.get("classification", "internal"),
-            "access_groups": json.dumps(meta.get("access_groups") or []),
-            "source": meta.get("source"),
-            "approved": None if "approved" not in meta else int(bool(meta["approved"])),
-            "news_source": meta.get("news_source"),
-            "derived": int(meta["doc_type"] == "prior_briefing"),                         # ING-6
-            "stale": int(meta["date"] < stale_before),                                     # ING-6
-            "duplicate_of": None,
-            "quarantined": int(meta["doc_type"] == "news" and meta.get("approved") is False),  # ING-7
-            "body": body,
-            "_norm": _normalized_body(body),
-        })
+        docs.append(
+            {
+                "doc_id": meta["doc_id"],
+                "doc_type": meta["doc_type"],
+                "title": meta["title"],
+                "date": meta["date"],
+                "author": meta.get("author"),
+                "client_id": cid,
+                "source_client_id": meta.get("client_id"),
+                "link_method": method,
+                "link_confidence": conf,
+                "mentions": json.dumps(meta.get("mentions") or []),
+                "classification": meta.get("classification", "internal"),
+                "access_groups": json.dumps(meta.get("access_groups") or []),
+                "source": meta.get("source"),
+                "approved": None if "approved" not in meta else int(bool(meta["approved"])),
+                "news_source": meta.get("news_source"),
+                "derived": int(meta["doc_type"] == "prior_briefing"),  # ING-6
+                "stale": int(meta["date"] < stale_before),  # ING-6
+                "duplicate_of": None,
+                "quarantined": int(meta["doc_type"] == "news" and meta.get("approved") is False),  # ING-7
+                "body": body,
+                "_norm": _normalized_body(body),
+            }
+        )
 
     # ING-5 dedup: same client, within 7 days, identical or near-identical normalized body.
     # Earlier (then shorter) document survives; forwards/replies quote the original so are longer.
@@ -252,12 +285,14 @@ def load_documents(conn, resolver: EntityResolver, merge_map: dict, report: dict
     for i, a in enumerate(docs):
         if a["duplicate_of"] or not a["client_id"]:
             continue
-        for b in docs[i + 1:]:
+        for b in docs[i + 1 :]:
             if b["duplicate_of"] or b["client_id"] != a["client_id"]:
                 continue
             if (date.fromisoformat(b["date"]) - date.fromisoformat(a["date"])).days > 7:
                 break
-            same_hash = hashlib.sha256(a["_norm"].encode()).digest() == hashlib.sha256(b["_norm"].encode()).digest()
+            same_hash = (
+                hashlib.sha256(a["_norm"].encode()).digest() == hashlib.sha256(b["_norm"].encode()).digest()
+            )
             if same_hash or fuzz.token_set_ratio(a["_norm"], b["_norm"]) >= 95:
                 b["duplicate_of"] = a["doc_id"]
                 dup_pairs.append({"doc_id": b["doc_id"], "duplicate_of": a["doc_id"]})
@@ -265,19 +300,28 @@ def load_documents(conn, resolver: EntityResolver, merge_map: dict, report: dict
     injection_docs = set()
     for d in docs:
         row = {k: v for k, v in d.items() if not k.startswith("_")}
-        conn.execute(f"INSERT INTO documents ({', '.join(row)}) VALUES ({', '.join('?' * len(row))})", list(row.values()))
+        conn.execute(
+            f"INSERT INTO documents ({', '.join(row)}) VALUES ({', '.join('?' * len(row))})",
+            list(row.values()),
+        )
         indexed = int(not d["duplicate_of"] and not d["quarantined"])
         for n, text in enumerate(_chunks(d["body"])):
             flagged = int(any(re.search(p, text, re.IGNORECASE) for p in INJECTION_PATTERNS))  # ING-8
             if flagged:
                 injection_docs.add(d["doc_id"])
-            conn.execute("INSERT INTO chunks VALUES (?,?,?,?,?,?)", (f"{d['doc_id']}#{n}", d["doc_id"], n, text, flagged, indexed))
+            conn.execute(
+                "INSERT INTO chunks VALUES (?,?,?,?,?,?)",
+                (f"{d['doc_id']}#{n}", d["doc_id"], n, text, flagged, indexed),
+            )
 
     report["documents"] = {
         "total": len(docs),
         "by_link_method": dict(Counter(d["link_method"] for d in docs)),
-        "inferred_links": [{"doc_id": d["doc_id"], "client_id": d["client_id"], "confidence": d["link_confidence"]}
-                           for d in docs if d["link_method"] == "inferred"],
+        "inferred_links": [
+            {"doc_id": d["doc_id"], "client_id": d["client_id"], "confidence": d["link_confidence"]}
+            for d in docs
+            if d["link_method"] == "inferred"
+        ],
         "unlinked": sorted(d["doc_id"] for d in docs if d["link_method"] == "unlinked"),
         "ambiguous": sorted(d["doc_id"] for d in docs if d["link_method"] == "ambiguous"),
         "duplicates": dup_pairs,
@@ -294,26 +338,42 @@ def load_documents(conn, resolver: EntityResolver, merge_map: dict, report: dict
 def build_index(conn, report: dict) -> None:
     from briefing.embeddings import embed_documents  # heavy import only when indexing
 
-    conn.execute("CREATE VIRTUAL TABLE chunk_fts USING fts5(chunk_id UNINDEXED, text, tokenize='porter unicode61')")
+    conn.execute(
+        "CREATE VIRTUAL TABLE chunk_fts USING fts5(chunk_id UNINDEXED, text, tokenize='porter unicode61')"
+    )
     conn.execute("CREATE TABLE chunk_vectors (chunk_id TEXT PRIMARY KEY, vec BLOB)")
     rows = conn.execute(
-        "SELECT c.chunk_id, c.text, d.title FROM chunks c JOIN documents d USING (doc_id) WHERE c.indexed = 1 ORDER BY c.chunk_id"
+        """
+        SELECT c.chunk_id, c.text, d.title
+        FROM chunks c JOIN documents d USING (doc_id)
+        WHERE c.indexed = 1
+        ORDER BY c.chunk_id
+        """
     ).fetchall()
     for r in rows:
-        conn.execute("INSERT INTO chunk_fts (chunk_id, text) VALUES (?, ?)", (r["chunk_id"], f"{r['title']}\n{r['text']}"))
+        conn.execute(
+            "INSERT INTO chunk_fts (chunk_id, text) VALUES (?, ?)",
+            (r["chunk_id"], f"{r['title']}\n{r['text']}"),
+        )
     t = time.time()
     vecs = embed_documents([f"{r['title']}\n{r['text']}" for r in rows])
-    for r, v in zip(rows, vecs):
+    for r, v in zip(rows, vecs, strict=True):
         conn.execute("INSERT INTO chunk_vectors VALUES (?, ?)", (r["chunk_id"], v.tobytes()))
-    report["index"] = {"chunks_indexed": len(rows), "embedding_model": config.EMBED_MODEL,
-                       "embedding_seconds": round(time.time() - t, 2)}
+    report["index"] = {
+        "chunks_indexed": len(rows),
+        "embedding_model": config.EMBED_MODEL,
+        "embedding_seconds": round(time.time() - t, 2),
+    }
 
 
 # ---------------------------------------------------------------- main (ING-11 report)
 
 
-def run(db_path: Path = config.DB_PATH, with_index: bool = True,
-        report_path: Path | None = config.VAR_DIR / "ingestion_report.json") -> dict:
+def run(
+    db_path: Path = config.DB_PATH,
+    with_index: bool = True,
+    report_path: Path | None = config.VAR_DIR / "ingestion_report.json",
+) -> dict:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     if db_path.exists():
         db_path.unlink()  # idempotent rebuild

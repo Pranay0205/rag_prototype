@@ -66,7 +66,7 @@ export interface Briefing {
   briefing_id: string
   client: { client_id: string; name: string; aliases: string[] }
   meeting: { meeting_id: string; date: string; purpose: string; attendees: string[] } | null
-  viewer: { user_id: string; role: string }
+  viewer: { user_id: string; role: string; clearance: string; groups: string[] }
   generated_at: string
   sections: Section[]
   conflicts: Conflict[]

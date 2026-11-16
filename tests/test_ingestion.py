@@ -31,13 +31,17 @@ def test_ING_2_lei_merge(conn):
     assert not rows(conn, "SELECT 1 FROM clients WHERE client_id='C-007'")
     # T5: green loan revenue booked under C-007 now counts for Helios
     ttm = conn.execute(
-        "SELECT SUM(revenue_usd) FROM revenue WHERE client_id='C-002' AND period IN ('2025Q4','2026Q1','2026Q2','2026Q3')"
+        "SELECT SUM(revenue_usd) FROM revenue "
+        "WHERE client_id='C-002' AND period IN ('2025Q4','2026Q1','2026Q2','2026Q3')"
     ).fetchone()[0]
     assert ttm == 3_500_000
 
 
 def test_ING_2_merge_dedups_coverage_and_contacts(conn):
-    assert conn.execute("SELECT COUNT(*) FROM coverage WHERE client_id='C-002' AND user_id='alex'").fetchone()[0] == 1
+    assert (
+        conn.execute("SELECT COUNT(*) FROM coverage WHERE client_id='C-002' AND user_id='alex'").fetchone()[0]
+        == 1
+    )
     assert not rows(conn, "SELECT 1 FROM contacts WHERE contact_id='K-203'")
 
 
@@ -92,7 +96,9 @@ def test_ING_7_unapproved_news_quarantined(conn):
 
 
 def test_ING_8_injection_flagged(conn):
-    flagged = {r["doc_id"] for r in rows(conn, "SELECT DISTINCT doc_id FROM chunks WHERE suspected_injection=1")}
+    flagged = {
+        r["doc_id"] for r in rows(conn, "SELECT DISTINCT doc_id FROM chunks WHERE suspected_injection=1")
+    }
     assert flagged == {"nw_email_007"}
 
 

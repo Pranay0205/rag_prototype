@@ -12,7 +12,22 @@ from dataclasses import dataclass
 
 from rapidfuzz import fuzz
 
-LEGAL_SUFFIXES = {"inc", "incorporated", "plc", "llc", "ltd", "limited", "corp", "corporation", "co", "lp", "sa", "ag", "nv", "bv"}
+LEGAL_SUFFIXES = {
+    "inc",
+    "incorporated",
+    "plc",
+    "llc",
+    "ltd",
+    "limited",
+    "corp",
+    "corporation",
+    "co",
+    "lp",
+    "sa",
+    "ag",
+    "nv",
+    "bv",
+}
 # Words that do not distinguish one company from another; extra occurrences are tolerated.
 GENERIC_WORDS = {"holdings", "holding", "group", "company", "the", "international", "global", "and", "of"}
 FUZZY_THRESHOLD = 90
@@ -36,7 +51,9 @@ class Match:
 class EntityResolver:
     def __init__(self, names_by_client: dict[str, set[str]]):
         # names_by_client: client_id -> raw names (legal, short, aliases), already merge-mapped
-        self.names = {cid: {normalize(n) for n in names if normalize(n)} for cid, names in names_by_client.items()}
+        self.names = {
+            cid: {normalize(n) for n in names if normalize(n)} for cid, names in names_by_client.items()
+        }
         self.tokens = {cid: {t for n in ns for t in n.split()} for cid, ns in self.names.items()}
 
     @classmethod

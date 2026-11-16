@@ -105,7 +105,9 @@ class MeetingRef(BaseModel):
 
 class Viewer(BaseModel):
     user_id: str
-    role: str  # drives entitlement filtering before retrieval
+    role: str
+    clearance: str  # public | internal | confidential (DATA-1)
+    groups: list[str] = []  # e.g. ["proj_aurora"]; required for restricted records
 
 
 class Briefing(BaseModel):

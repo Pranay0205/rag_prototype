@@ -13,7 +13,6 @@ import json
 import logging
 import os
 import re
-from typing import TypeVar
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -22,7 +21,6 @@ from pydantic import BaseModel, ValidationError
 load_dotenv()
 log = logging.getLogger(__name__)
 
-T = TypeVar("T", bound=BaseModel)
 
 BASE_URL = os.environ.get("LLM_BASE_URL", "https://openrouter.ai/api/v1")
 _IS_OPENROUTER = "openrouter.ai" in BASE_URL
@@ -44,7 +42,7 @@ class LLMError(RuntimeError):
     pass
 
 
-def chat_json(
+def chat_json[T: BaseModel](
     system: str,
     user: str,
     schema: type[T],
