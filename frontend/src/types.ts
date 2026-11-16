@@ -19,6 +19,7 @@ export interface Citation {
   title: string
   date: string | null
   snippet: string
+  quote?: string | null // exact supporting span, located in the source by the backend
 }
 
 export interface Claim {

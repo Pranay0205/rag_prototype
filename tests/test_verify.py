@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 
-from briefing.verify import check_numbers, extract_quantities, unsupported_numbers
+from briefing.verify import check_numbers, extract_quantities, locate_quote, unsupported_numbers
 
 # The real revenue summary evidence produced by get_revenue (TOOL-6)
 E1 = (
@@ -109,3 +109,32 @@ def test_ORC_6_product_line_revenue_still_needs_sql():
     assert check_numbers(
         "FX revenue fell to $900,000.", [{"kind": "document", "derived": False, "text": "$900,000"}]
     ) == ["$900,000"]
+
+
+# ORC-6 quote location: the displayed quote always comes from the evidence, never the model
+EMAIL_BODY = """Alex,
+
+Thanks for the time today. I would like Meridian's proposal for a structured 12-month EUR forward
+program, including indicative pricing and credit line usage, by mid-October."""
+
+
+def test_ORC_6_quote_exact_match_ignores_line_breaks():
+    q = "I would like Meridian's proposal for a structured 12-month EUR forward program"
+    assert locate_quote(q, EMAIL_BODY) == q
+
+
+def test_ORC_6_quote_small_slip_returns_real_sentence():
+    slipped = "I'd like Meridian's proposal for a structured 12-month EUR forward program, including indicative pricing and credit line usage, by mid-October."  # noqa: E501
+    found = locate_quote(slipped, EMAIL_BODY)
+    assert found is not None and found.startswith("I would like") and found in " ".join(EMAIL_BODY.split())
+
+
+def test_ORC_6_invented_quote_rejected():
+    assert locate_quote("The client approved the proposal.", EMAIL_BODY) is None
+    assert locate_quote("", EMAIL_BODY) is None
+
+
+def test_ORC_6_uncertainty_may_quote_stale_metric():
+    claim = "The prior briefing described TTM relationship revenue as about $4.1M."
+    assert check_numbers(claim, [STALE_BRIEFING, SQL_E1], allow_derived=True) == []
+    assert check_numbers(claim, [STALE_BRIEFING, SQL_E1]) == ["$4.1M"]  # anywhere else: still flagged

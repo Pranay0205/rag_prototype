@@ -12,6 +12,8 @@ import re
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 
+from rapidfuzz import fuzz
+
 _QUANTITY = re.compile(
     r"""
     (?<![\w.])                                         # not inside a word or another number
@@ -95,5 +97,33 @@ def check_numbers(claim_text: str, cited: list[dict], allow_derived: bool = Fals
     describe stale values. Returns the unsupported quantities (empty = pass)."""
     usable = cited if allow_derived else [e for e in cited if not e.get("derived")]  # (a)
     if _RELATIONSHIP_METRIC.search(claim_text):
-        usable = [e for e in usable if e["kind"] == "sql"]  # (b)
+        # (b) sql only; in the Uncertainty section a prior briefing may back the stale value it states
+        usable = [e for e in usable if e["kind"] == "sql" or (allow_derived and e.get("derived"))]
     return unsupported_numbers(claim_text, [e["text"] for e in usable])
+
+
+# ORC-6: locating the model's supporting quote inside the real evidence text.
+_SENTENCE = re.compile(r"(?<=[.!?;])\s+|\n+")
+QUOTE_FUZZY_THRESHOLD = 90
+
+
+def locate_quote(quote: str, evidence_text: str) -> str | None:
+    """Return the span of `evidence_text` that the model's quote refers to, or None.
+
+    The returned text always comes from the evidence, never from the model:
+      1. exact match (whitespace-insensitive) -> that span of the evidence
+      2. otherwise the evidence sentence that best matches (rapidfuzz ratio >= 90), which
+         tolerates small copying slips such as changed punctuation
+    """
+    q = " ".join(quote.split())
+    if not q:
+        return None
+    flat = " ".join(evidence_text.split())
+    start = flat.lower().find(q.lower())
+    if start >= 0:
+        return flat[start : start + len(q)]
+    sentences = [s.strip() for s in _SENTENCE.split(flat) if s.strip()]
+    best = max(sentences, key=lambda s: fuzz.ratio(q.lower(), s.lower()), default=None)
+    if best and fuzz.ratio(q.lower(), best.lower()) >= QUOTE_FUZZY_THRESHOLD:
+        return best
+    return None

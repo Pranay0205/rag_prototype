@@ -88,7 +88,22 @@ app = FastAPI(title="Client Briefing API", lifespan=lifespan)
 
 @app.get("/api/users")
 def users():
-    return rows(connect(), "SELECT user_id, name, title, clearance FROM users ORDER BY user_id")
+    """Personas for the demo sign-in screen. In production identity comes from SSO."""
+    conn = connect()
+    out = []
+    for u in rows(conn, "SELECT user_id, name, title, clearance, groups FROM users ORDER BY user_id"):
+        covered = rows(
+            conn,
+            """
+            SELECT c.legal_name, cv.coverage_role
+            FROM coverage cv JOIN clients c USING (client_id)
+            WHERE cv.user_id = ?
+            ORDER BY c.legal_name
+            """,
+            (u["user_id"],),
+        )
+        out.append({**u, "groups": jlist(u["groups"]), "coverage": covered})
+    return out
 
 
 @app.get("/api/meetings")

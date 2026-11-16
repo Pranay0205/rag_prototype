@@ -47,6 +47,9 @@ class Citation(BaseModel):
     title: str  # human label, e.g. "Email from CFO, 14 Sep 2026"
     date: Date | None = None
     snippet: str  # exact supporting text or row rendering, shown on hover/click
+    # The exact span inside `snippet` that supports the claim. Located by code (verify.locate_quote),
+    # never taken on trust from the model; None when it could not be found.
+    quote: str | None = None
 
 
 class Claim(BaseModel):

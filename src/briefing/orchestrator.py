@@ -38,7 +38,7 @@ from briefing.schemas import (
     Viewer,
 )
 from briefing.tools import ToolResult, Tools
-from briefing.verify import check_numbers
+from briefing.verify import check_numbers, locate_quote
 
 log = logging.getLogger(__name__)
 
@@ -55,9 +55,14 @@ class BriefingError(RuntimeError):
 # ---------------------------------------------------------------- model output contracts (ORC-5, ORC-6)
 
 
+class DraftCite(BaseModel):
+    id: str
+    quote: str = ""  # sentence copied from the evidence; checked by verify.locate_quote
+
+
 class DraftClaim(BaseModel):
     text: str
-    cite: list[str]
+    cite: list[DraftCite]
 
 
 class DraftConflictValue(BaseModel):
@@ -383,17 +388,14 @@ def run_section(
     checked, decisions = [], []
     for i, dc in enumerate(draft.claims):
         cid = f"{spec.key.value}-{i + 1}"
-        if not dc.cite or any(c not in by_id for c in dc.cite):
+        ids = [c.id for c in dc.cite]
+        if not ids or any(i not in by_id for i in ids):
             decisions.append(
-                {
-                    "claim_id": cid,
-                    "text": dc.text,
-                    "dropped": "unknown or missing evidence id",
-                    "cite": dc.cite,
-                }
+                {"claim_id": cid, "text": dc.text, "dropped": "unknown or missing evidence id", "cite": ids}
             )
             continue
-        cited = [by_id[c] for c in dc.cite]
+        cited = [by_id[i] for i in ids]
+        quotes = [locate_quote(c.quote, by_id[c.id].text) for c in dc.cite]
         # Step 2: numbers, with rules (a) and (b)
         bad_numbers = check_numbers(
             dc.text,
@@ -407,6 +409,7 @@ def run_section(
                 "claim_id": cid,
                 "text": _clean(dc.text),
                 "cited": cited,
+                "quotes": quotes,
                 "bad_numbers": bad_numbers,
                 "tainted": tainted,
             }
@@ -440,7 +443,10 @@ def run_section(
             Claim(
                 id=c["claim_id"],
                 text=c["text"],
-                citations=[e.citation for e in c["cited"]],
+                citations=[
+                    e.citation.model_copy(update={"quote": q})
+                    for e, q in zip(c["cited"], c["quotes"], strict=True)
+                ],
                 confidence=confidence,
                 status=ClaimStatus.VERIFIED if verified else ClaimStatus.UNVERIFIED,
             )
@@ -451,6 +457,7 @@ def run_section(
                 "text": c["text"],
                 "cite": [e.eid for e in c["cited"]],
                 "judge": verdict,
+                "quotes_located": sum(q is not None for q in c["quotes"]),
                 "bad_numbers": c["bad_numbers"],
                 "injection": c["tainted"],
                 "verified": verified,

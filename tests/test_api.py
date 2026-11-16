@@ -12,7 +12,7 @@ from briefing.orchestrator import JudgeResult, SectionDraft
 
 def fake_chat_json(system, user, schema, fast=False, **_):
     if schema is SectionDraft:
-        return SectionDraft.model_validate({"claims": [{"text": "A fact.", "cite": ["E1"]}]})
+        return SectionDraft.model_validate({"claims": [{"text": "A fact.", "cite": [{"id": "E1"}]}]})
     if schema is JudgeResult:
         ids = [
             line.split(":")[0].removeprefix("Claim ")
@@ -68,7 +68,10 @@ def sse_events(client, briefing_id):
 
 
 def test_API_1_users(client):
-    assert {u["user_id"] for u in client.get("/api/users").json()} == {"alex", "sam", "kim"}
+    users = {u["user_id"]: u for u in client.get("/api/users").json()}
+    assert set(users) == {"alex", "sam", "kim"}
+    assert [c["legal_name"] for c in users["kim"]["coverage"]] == ["Helios Renewables plc"]
+    assert users["kim"]["groups"] == ["proj_aurora"] and users["sam"]["groups"] == []
 
 
 def test_API_2_meetings_limited_to_coverage(client):

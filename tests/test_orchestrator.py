@@ -65,8 +65,8 @@ def test_ORC_6_drops_unknown_evidence_id(monkeypatch):
         fake_llm(
             {
                 "claims": [
-                    {"text": "Revenue fell 18.1% to $3.4M.", "cite": ["E1"]},
-                    {"text": "Made-up fact.", "cite": ["E9"]},
+                    {"text": "Revenue fell 18.1% to $3.4M.", "cite": [{"id": "E1"}]},
+                    {"text": "Made-up fact.", "cite": [{"id": "E9"}]},
                 ]
             }
         ),
@@ -79,7 +79,9 @@ def test_ORC_6_drops_unknown_evidence_id(monkeypatch):
 
 def test_ORC_6_number_must_match_sql(monkeypatch):
     monkeypatch.setattr(
-        llm, "chat_json", fake_llm({"claims": [{"text": "Relationship revenue is $4.1M.", "cite": ["E1"]}]})
+        llm,
+        "chat_json",
+        fake_llm({"claims": [{"text": "Relationship revenue is $4.1M.", "cite": [{"id": "E1"}]}]}),
     )
     section, *_ = run_section(METRICS, evidence(), CONTEXT)
     assert section.claims[0].status == ClaimStatus.UNVERIFIED  # judge said supported, numbers did not
@@ -87,7 +89,7 @@ def test_ORC_6_number_must_match_sql(monkeypatch):
 
 def test_ORC_6_injection_capped(monkeypatch):
     monkeypatch.setattr(
-        llm, "chat_json", fake_llm({"claims": [{"text": "Northwind opened an RFP.", "cite": ["E2"]}]})
+        llm, "chat_json", fake_llm({"claims": [{"text": "Northwind opened an RFP.", "cite": [{"id": "E2"}]}]})
     )
     section, *_ = run_section(METRICS, evidence(), CONTEXT)
     assert section.claims[0].status == ClaimStatus.UNVERIFIED
@@ -95,7 +97,9 @@ def test_ORC_6_injection_capped(monkeypatch):
 
 def test_ORC_6_judge_unsupported(monkeypatch):
     monkeypatch.setattr(
-        llm, "chat_json", fake_llm({"claims": [{"text": "Revenue grew.", "cite": ["E1"]}]}, "unsupported")
+        llm,
+        "chat_json",
+        fake_llm({"claims": [{"text": "Revenue grew.", "cite": [{"id": "E1"}]}]}, "unsupported"),
     )
     section, *_ = run_section(METRICS, evidence(), CONTEXT)
     assert section.claims[0].status == ClaimStatus.UNVERIFIED
@@ -136,7 +140,7 @@ def tools(tmp_path_factory):
 
 
 def test_ORC_9_section_failure_isolated(monkeypatch, tools):
-    ok = fake_llm({"claims": [{"text": "A fact.", "cite": ["E1"]}]})
+    ok = fake_llm({"claims": [{"text": "A fact.", "cite": [{"id": "E1"}]}]})
 
     def flaky(system, user, schema, fast=False, **kw):
         if schema is SectionDraft and "Section: Recent news" in user:
@@ -163,3 +167,24 @@ def test_ORC_8_overdue_actions_suggested(monkeypatch, tools):
     b = orchestrator.run_briefing(tools, "alex", "C-001")
     assert {"overdue-A-101", "overdue-A-102"} <= {a.id for a in b.suggested_actions}
     assert not b.access_limited
+
+
+def test_ORC_6_citation_carries_located_quote(monkeypatch):
+    monkeypatch.setattr(
+        llm,
+        "chat_json",
+        fake_llm(
+            {
+                "claims": [
+                    {"text": "Revenue fell 18.1%.", "cite": [{"id": "E1", "quote": "YoY -18.1%"}]},
+                    {
+                        "text": "Revenue is $3.4M.",
+                        "cite": [{"id": "E1", "quote": "a sentence that is not there"}],
+                    },
+                ]
+            }
+        ),
+    )
+    section, *_ = run_section(METRICS, evidence(), CONTEXT)
+    assert section.claims[0].citations[0].quote == "YoY -18.1%"
+    assert section.claims[1].citations[0].quote is None  # never shown if not in the source
