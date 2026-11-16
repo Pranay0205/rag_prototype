@@ -1,0 +1,9 @@
+client_id,user_id,coverage_role,is_primary
+C-001,alex,relationship_manager,true
+C-001,sam,analyst,false
+C-002,alex,relationship_manager,true
+C-002,sam,analyst,false
+C-002,kim,deal_team,false
+C-003,alex,relationship_manager,true
+C-003,sam,analyst,false
+C-007,alex,relationship_manager,true

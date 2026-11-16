@@ -1,0 +1,4 @@
+meeting_id,client_id,start_time,purpose,our_attendees,client_attendees
+M-901,C-001,2026-11-18T10:00:00,Quarterly business review with new CFO,alex;sam,Raj Menon;Lucia Ferrante
+M-902,C-002,2026-11-19T15:00:00,Green bond financing discussion,alex;sam,Priya Raman;Oliver Grant
+M-903,C-003,2026-11-20T11:00:00,Relationship review,alex;sam,Mark Ellison;Jen Alvarez

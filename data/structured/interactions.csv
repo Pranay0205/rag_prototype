@@ -1,0 +1,7 @@
+interaction_id,client_id,date,type,subject,our_attendees,client_attendees,doc_ref
+I-101,C-001,2026-06-12,meeting,Annual relationship review,alex;sam,Tom Becker;Dana Whitfield,nw_meeting_001
+I-102,C-001,2026-09-24,call,Introduction call with new CFO,alex,Raj Menon,nw_note_002
+I-201,C-002,2026-05-22,meeting,Annual relationship review,alex;sam,Priya Raman;Oliver Grant,he_briefing_2026_05
+I-202,C-002,2026-10-08,call,Green bond planning,alex,Priya Raman;Oliver Grant,he_note_002
+I-301,C-003,2026-03-18,meeting,Relationship review,alex;sam,Mark Ellison,ca_briefing_2026_03
+I-302,C-003,2026-08-20,call,Custody service escalation,alex,Mark Ellison,ca_note_001

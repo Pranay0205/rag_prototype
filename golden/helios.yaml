@@ -1,0 +1,20 @@
+# Helios checks focus on entitlements and the merged client record.
+client_id: C-002
+cases:
+  - viewer: alex
+    must_include:
+      - fact: "TTM relationship revenue $3.5M including the green loan booked under the merged Helios Energy record"
+        sources: [sql:revenue]
+      - fact: "Helios plans a EUR 500M green bond in H1 2027; comparables and framework review promised by 25 November"
+        sources: [doc:he_email_001, doc:he_note_002, sql:open_actions/A-201]
+      - fact: "Client is asking for a 15 bps tighter term loan margin"
+        sources: [doc:he_email_004]
+    must_not_contain: ["Aurora", "wind portfolio", "sell-side"]
+    expect_access_limited: true
+  - viewer: sam
+    must_not_contain: ["Aurora", "wind portfolio", "sell-side", "15 basis points", "15 bps"]
+    expect_access_limited: true
+  - viewer: kim
+    must_include:
+      - fact: "Project Aurora: sale of the 1.2 GW onshore wind portfolio, Meridian is sell-side advisor"
+        sources: [doc:he_note_005]

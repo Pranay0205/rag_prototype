@@ -1,0 +1,5 @@
+issue_id,client_id,opened_date,severity,status,summary,resolved_date,classification
+S-101,C-001,2026-09-08,high,resolved,Delayed EUR supplier payments (2 days) due to sanctions-screening false positive,2026-09-12,internal
+S-102,C-001,2026-10-20,medium,open,Online banking: new treasury users cannot approve payments after CFO transition,,internal
+S-201,C-002,2026-06-02,low,resolved,Green loan KPI report template mismatch,2026-06-20,internal
+S-301,C-003,2026-08-15,high,open,Custody statement reconciliation breaks for July and August,,internal

@@ -1,0 +1,9 @@
+holding_id,client_id,product,status,notional_usd,opened_date,maturity_date,notes
+H-101,C-001,Revolving Credit Facility,active,150000000,2022-06-30,2027-06-30,Utilization 62% as of 2026-09-30
+H-102,C-001,Cash Management - Operating Accounts,active,,2019-04-01,,
+H-103,C-001,FX Spot,active,,2019-04-01,,No forward or hedging lines in place
+H-201,C-002,Term Loan,active,300000000,2021-09-15,2028-09-15,
+H-202,C-007,Green Loan,active,120000000,2026-01-20,2031-01-20,Sustainability-linked; KPI reporting semi-annual
+H-203,C-002,FX Forwards,active,,2022-03-01,,
+H-301,C-003,Global Custody,active,,2021-03-01,,Assets under custody $850M as of 2026-06-30
+H-302,C-003,Cash Management - Operating Accounts,active,,2021-02-01,,

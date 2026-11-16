@@ -1,0 +1,10 @@
+contact_id,client_id,name,title,role_type,email,is_active,start_date,end_date
+K-101,C-001,Raj Menon,Chief Financial Officer,decision_maker,raj.menon@northwind.example,true,2026-09-01,
+K-102,C-001,Dana Whitfield,Chief Financial Officer,decision_maker,dana.whitfield@northwind.example,false,2021-05-01,2026-08-31
+K-103,C-001,Lucia Ferrante,Treasurer,influencer,lucia.ferrante@northwind.example,true,2022-02-01,
+K-104,C-001,Tom Becker,Chief Executive Officer,executive_sponsor,tom.becker@northwind.example,true,2018-01-01,
+K-201,C-002,Priya Raman,Group Chief Financial Officer,decision_maker,priya.raman@helios.example,true,2020-01-01,
+K-202,C-002,Oliver Grant,Head of Sustainability Finance,influencer,oliver.grant@helios.example,true,2022-06-01,
+K-203,C-007,Priya Raman,CFO,decision_maker,p.raman@heliosenergy.example,true,2024-02-14,
+K-301,C-003,Mark Ellison,Chief Financial Officer,decision_maker,mark.ellison@cascadehealth.example,true,2019-04-01,
+K-302,C-003,Jen Alvarez,VP Treasury,influencer,jen.alvarez@cascadehealth.example,true,2021-01-19,

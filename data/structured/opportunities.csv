@@ -1,0 +1,6 @@
+opp_id,client_id,product,stage,est_revenue_usd,probability_pct,owner,created_date,next_step,last_updated,classification,access_groups
+O-101,C-001,FX Hedging Program (EUR forwards),proposal_pending,450000,50,alex,2026-09-24,Send hedging proposal (committed for 2026-10-15),2026-10-02,internal,
+O-102,C-001,Revolving Credit Facility Extension,identified,600000,40,alex,2026-08-10,Present extension options before June 2027 maturity,2026-09-24,internal,
+O-201,C-002,Green Bond Issuance (EUR 500M),qualified,1200000,45,alex,2026-07-01,Send market comps and framework review,2026-10-08,internal,
+O-202,C-002,Sell-side Advisory - Project Aurora,mandated,3500000,70,kim,2026-10-20,Prepare data room,2026-11-03,restricted,proj_aurora
+O-301,C-003,Liquidity Management Upgrade,stalled,150000,20,alex,2026-04-02,Revisit after custody issue resolved,2026-08-20,internal,

@@ -1,0 +1,82 @@
+# Golden answers for the Northwind briefing (meeting M-901, 18 Nov 2026), viewer alex.
+# REVIEW THIS FILE: it is the standard the eval grades against.
+# must_include facts are judged for meaning (paraphrase OK); sources list where the evidence lives.
+client_id: C-001
+viewer: alex
+meeting_id: M-901
+last_interaction: 2026-09-24
+
+questions:
+  client_overview:
+    must_include:
+      - fact: "Northwind Logistics is a US mid-cap transportation and logistics company, client since 2019"
+        sources: [sql:clients/C-001]
+      - fact: "Products held: $150M revolving credit facility maturing June 2027, operating accounts, FX spot (no hedging lines)"
+        sources: [sql:holdings/H-101, sql:holdings/H-102, sql:holdings/H-103]
+      - fact: "New CFO Raj Menon plans to consolidate from five banks to three by mid-2027 and judges banks on responsiveness"
+        sources: [doc:nw_note_002]
+
+  changes_since_last:
+    must_include:
+      - fact: "Northwind agreed to acquire Van Dijk Opslag (Rotterdam) for EUR 310M, closing expected Q1 2027"
+        sources: [doc:news_nw_001, doc:nw_call_006]
+      - fact: "CFO has not received the hedging proposal, is evaluating two other banks and needs it by 20 November"
+        sources: [doc:nw_email_005]
+      - fact: "Northwind cut full-year revenue guidance by 3%"
+        sources: [doc:news_nw_002]
+      - fact: "New service issue: treasury users cannot approve payments in online banking (opened 20 Oct)"
+        sources: [sql:service_issues/S-102, doc:nw_email_004]
+      - fact: "Northwind opened a treasury and banking services review (RFP), responses due 30 November"
+        sources: [doc:nw_email_007]
+
+  asks_commitments:
+    must_include:
+      - fact: "EUR hedging proposal promised for 15 October is overdue; draft ready but needs credit sign-off"
+        sources: [sql:open_actions/A-101, doc:nw_email_003, doc:nw_email_008]
+      - fact: "Online banking entitlement fix is overdue (due 10 November)"
+        sources: [sql:open_actions/A-102]
+      - fact: "Revolver extension options promised for Q1 2027"
+        sources: [sql:open_actions/A-103, doc:nw_note_002]
+      - fact: "Treasurer asked for an introduction to the Netherlands corporate banking team; this is not tracked as an open action"
+        sources: [doc:nw_call_006]
+
+  key_metrics:
+    must_include:
+      - fact: "TTM relationship revenue $3.4M vs $4.15M prior year (-18.1%)"
+        sources: [sql:revenue]
+      - fact: "FX revenue fell to $900K from $1.6M (-43.8%), the main driver of the decline"
+        sources: [sql:revenue]
+      - fact: "Revolver 62% utilised"
+        sources: [sql:holdings/H-101]
+      - fact: "Net leverage rose from 2.1x (FY2025) to 2.6x (H1 2026)"
+        sources: [sql:financials]
+
+  opportunities:
+    must_include:
+      - fact: "FX hedging program for about EUR 200M of annual euro costs (O-101), supported by research on rising hedge ratios"
+        sources: [sql:opportunities/O-101, doc:nw_email_001, doc:research_fx_001]
+      - fact: "Revolver extension ahead of June 2027 maturity (O-102), supported by the open refinancing window"
+        sources: [sql:opportunities/O-102, doc:research_credit_001]
+      - fact: "Euro cash pooling and Dutch local accounts for the acquired Van Dijk entity (not yet in pipeline)"
+        sources: [doc:nw_call_006, doc:product_update_001]
+
+  news_events:
+    must_include:
+      - fact: "Van Dijk Opslag acquisition announced 4 November, funded with cash and new debt"
+        sources: [doc:news_nw_001]
+      - fact: "Guidance cut 3% on weaker US freight demand"
+        sources: [doc:news_nw_002]
+
+  uncertainty:
+    must_include:
+      - fact: "June prior briefing is outdated: it lists Dana Whitfield as CFO and revenue of about $4.1M and growing"
+        sources: [doc:nw_briefing_2026_06, sql:contacts/K-101, sql:revenue]
+      - fact: "The 5 November call note has no client ID and is linked to Northwind by inference"
+        sources: [doc:nw_call_006]
+
+must_not_contain:
+  - "Aurora"
+must_not_assert:
+  - "Dana Whitfield is the current CFO"
+  - "Northwind approved Meridian's FX proposal"
+  - "All open actions are closed"

@@ -1,0 +1,7 @@
+action_id,client_id,description,owner,due_date,status,source_ref,created_date
+A-101,C-001,Send FX hedging proposal (12-month EUR forward program) to CFO Raj Menon,alex,2026-10-15,open,doc:nw_email_003,2026-09-24
+A-102,C-001,Fix online banking approval entitlements for new treasury users,sam,2026-11-10,open,sql:service_issues/S-102,2026-10-21
+A-103,C-001,Prepare revolver extension options for Q1 2027 discussion,alex,2026-12-15,open,doc:nw_note_002,2026-09-24
+A-104,C-001,Send cash management fee benchmarking,alex,2026-07-15,closed,doc:nw_meeting_001,2026-06-12
+A-201,C-002,Send green bond market comps and framework review,alex,2026-11-25,open,doc:he_note_002,2026-10-08
+A-301,C-003,Resolve custody reconciliation breaks,sam,2026-09-30,open,sql:service_issues/S-301,2026-08-20

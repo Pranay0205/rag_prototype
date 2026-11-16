@@ -1,0 +1,6 @@
+client_id,fiscal_period,company_revenue_usd_m,ebitda_margin_pct,net_leverage_x,source
+C-001,FY2025,2140,11.2,2.1,Annual report (10-K)
+C-001,H1 2026,1130,10.4,2.6,Interim report (10-Q)
+C-002,FY2025,3800,41.0,4.8,Annual report
+C-002,H1 2026,1950,39.5,5.0,Interim report
+C-003,FY2025,920,14.5,1.9,Audited financial statements

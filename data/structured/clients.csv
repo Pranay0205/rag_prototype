@@ -1,0 +1,5 @@
+client_id,legal_name,short_name,lei,segment,industry,hq_country,hq_city,status,created_date
+C-001,Northwind Logistics Inc.,Northwind,5493001KJTIIGC8Y1R12,Corporate - Mid Cap,Transportation & Logistics,US,"Columbus, OH",active,2019-03-11
+C-002,Helios Renewables plc,Helios,213800HLRN7Q2W4E6T81,Corporate - Large Cap,Renewable Energy,GB,London,active,2020-07-02
+C-003,Cascade Health Partners LLC,Cascade Health,549300CHP4X8Z2M7K301,Corporate - Mid Cap,Healthcare Services,US,"Portland, OR",active,2021-01-19
+C-007,Helios Renewables PLC,Helios Energy,213800HLRN7Q2W4E6T81,Corporate - Large Cap,Utilities,GB,London,active,2024-02-14

@@ -1,0 +1,14 @@
+# Cascade checks focus on conflicts, missing data and news filtering.
+client_id: C-003
+cases:
+  - viewer: alex
+    must_include:
+      - fact: "Client says custody moved to another provider on 1 October, but holdings still show custody as active; verify with owner"
+        sources: [doc:ca_email_002, sql:holdings/H-301]
+      - fact: "Custody reconciliation breaks (S-301) remain open and the fix is overdue (due 30 September)"
+        sources: [sql:service_issues/S-301, sql:open_actions/A-301]
+      - fact: "2026Q3 revenue is not available, so trailing twelve-month revenue cannot be computed"
+        sources: [sql:revenue]
+      - fact: "Cascade opened three new clinics in Oregon"
+        sources: [doc:news_ca_003]
+    must_not_contain: ["data breach", "private equity"]
