@@ -54,7 +54,8 @@ class Citation(BaseModel):
 
 class Claim(BaseModel):
     id: str
-    text: str
+    text: str  # clean text (verification, export)
+    annotated: str | None = None  # same text with inline markers [n] -> citations[n-1], for display
     citations: list[Citation] = Field(min_length=1)
     confidence: Confidence
     status: ClaimStatus

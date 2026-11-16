@@ -8,6 +8,7 @@ briefing (ORC-9).
 
 import json
 import logging
+import re
 import time
 import uuid
 from collections.abc import Callable
@@ -210,7 +211,8 @@ SECTIONS = [
         "What is uncertain, conflicting or unavailable?",
         "Compare prior briefings and client statements against system records "
         "and report every disagreement as a "
-        "conflict. List missing data as unknowns. Claims here describe the uncertainty itself.",
+        "conflict. List missing data as unknowns. Say when a claim relies on evidence marked "
+        "INFERRED-LINK. Claims here describe the uncertainty itself.",
         ("profile", "revenue", "holdings"),
         ("prior_briefing",) + tuple(CONVERSATION_DOCS),
         (
@@ -339,6 +341,8 @@ def build_evidence(
                     ("STALE", chunk["stale"]),
                     ("INFERRED-LINK", chunk["link_method"] == "inferred"),
                     ("SUSPECTED-INJECTION", chunk["suspected_injection"]),
+                    ("CONFIDENTIAL", chunk["classification"] == "confidential"),
+                    ("RESTRICTED", chunk["classification"] == "restricted"),
                 )
                 if on
             ]
@@ -360,6 +364,27 @@ def build_evidence(
 
 
 # ---------------------------------------------------------------- generate + verify (ORC-5, ORC-6)
+
+
+_MARKER = re.compile(r"\s*\[(E\d+(?:\s*,\s*E\d+)*)\]")
+
+
+def _annotate(raw: str, ids: list[str], has_inline: bool) -> tuple[str, str]:
+    """Turn model markers [E3] into per-claim numbers [1] (citations[n-1]).
+
+    Returns (clean text for verification and export, annotated text for display). If the model
+    wrote no inline markers, all citations are appended at the end of the claim.
+    """
+    number = {eid: n for n, eid in enumerate(ids, start=1)}
+    clean = _clean(re.sub(r"\s+([.,;:])", r"\1", _MARKER.sub("", raw)))
+    if has_inline:
+        annotated = _MARKER.sub(
+            lambda m: " " + "".join(f"[{number[i.strip()]}]" for i in m.group(1).split(",")), raw
+        )
+        return clean, _clean(annotated)
+    marks = "".join(f"[{n}]" for n in number.values())
+    body, end = (clean[:-1], clean[-1]) if clean.endswith(".") else (clean, "")
+    return clean, f"{body} {marks}{end}"
 
 
 def _clean(text: str) -> str:
@@ -388,17 +413,21 @@ def run_section(
     checked, decisions = [], []
     for i, dc in enumerate(draft.claims):
         cid = f"{spec.key.value}-{i + 1}"
-        ids = [c.id for c in dc.cite]
+        # Inline markers ("... on 2026-09-01 [E3]") plus the cite list, in order of appearance
+        inline = [i.strip() for group in _MARKER.findall(dc.text) for i in group.split(",")]
+        ids = list(dict.fromkeys(inline + [c.id for c in dc.cite]))
         if not ids or any(i not in by_id for i in ids):
             decisions.append(
                 {"claim_id": cid, "text": dc.text, "dropped": "unknown or missing evidence id", "cite": ids}
             )
             continue
         cited = [by_id[i] for i in ids]
-        quotes = [locate_quote(c.quote, by_id[c.id].text) for c in dc.cite]
-        # Step 2: numbers, with rules (a) and (b)
+        quote_for = {c.id: c.quote for c in dc.cite}
+        quotes = [locate_quote(quote_for.get(i, ""), by_id[i].text) for i in ids]
+        text, annotated = _annotate(dc.text, ids, has_inline=bool(inline))
+        # Step 2: numbers, with rules (a) and (b), on the clean text
         bad_numbers = check_numbers(
-            dc.text,
+            text,
             [{"kind": e.kind, "derived": e.derived, "text": e.text} for e in cited],
             allow_derived=spec.key == SectionKey.UNCERTAINTY,
         )
@@ -407,7 +436,8 @@ def run_section(
         checked.append(
             {
                 "claim_id": cid,
-                "text": _clean(dc.text),
+                "text": text,
+                "annotated": annotated,
                 "cited": cited,
                 "quotes": quotes,
                 "bad_numbers": bad_numbers,
@@ -443,6 +473,7 @@ def run_section(
             Claim(
                 id=c["claim_id"],
                 text=c["text"],
+                annotated=c["annotated"],
                 citations=[
                     e.citation.model_copy(update={"quote": q})
                     for e, q in zip(c["cited"], c["quotes"], strict=True)
@@ -463,6 +494,7 @@ def run_section(
                 "verified": verified,
             }
         )
+    claims += completeness_backstop(spec, evidence, claims, decisions)
     trace["decisions"] = decisions
 
     conflicts = []
@@ -500,6 +532,43 @@ def run_section(
         confidence = Confidence.LOW
     section = Section(key=spec.key, title=spec.title, claims=claims, confidence=confidence)
     return section, conflicts, unknowns, follow_ups, trace
+
+
+# ORC-12: structured items a section must never drop, whatever the model chooses to write.
+GUARANTEED = {
+    SectionKey.OPPORTUNITIES: ("sql:opportunities/", "In pipeline: "),
+    SectionKey.ASKS_COMMITMENTS: ("sql:open_actions/", "Open action: "),
+}
+
+
+def completeness_backstop(
+    spec: SectionSpec, evidence: list[Evidence], claims: list[Claim], decisions: list[dict]
+) -> list[Claim]:
+    """Pipeline opportunities and open actions in the evidence but cited by no claim are added as
+    claims rendered from the database row, so they are verified by construction. Only rows already
+    cleared for the viewer are in the evidence, so this can never leak."""
+    if spec.key not in GUARANTEED:
+        return []
+    prefix, label = GUARANTEED[spec.key]
+    cited = {c.source_id for claim in claims for c in claim.citations}
+    added = []
+    for e in evidence:
+        sid = e.citation.source_id
+        if not sid.startswith(prefix) or sid in cited or e.text.rstrip(")").endswith("closed"):
+            continue
+        claim_id = f"{spec.key.value}-row-{len(added) + 1}"
+        added.append(
+            Claim(
+                id=claim_id,
+                text=label + e.text,
+                annotated=f"{label}{e.text} [1]",
+                citations=[e.citation.model_copy(update={"quote": e.text})],
+                confidence=Confidence.HIGH,
+                status=ClaimStatus.VERIFIED,
+            )
+        )
+        decisions.append({"claim_id": claim_id, "text": label + e.text, "added_by": "completeness backstop"})
+    return added
 
 
 # ---------------------------------------------------------------- actions (ORC-8)
@@ -569,6 +638,8 @@ def run_briefing(
         attendees = ", ".join(meeting["client_attendees"])
         meeting_line = f"{meeting['start_time']} - {meeting['purpose']} with {attendees}"
     context = {
+        "viewer": f"{viewer.role}, clearance {viewer.clearance}"
+        + (f", cleared for {', '.join(viewer.groups)}" if viewer.groups else ""),
         "client_name": client["legal_name"],
         "client_id": client["client_id"],
         "today": config.TODAY.isoformat(),

@@ -84,6 +84,23 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 const post = <T>(path: string, body: unknown) =>
   request<T>(path, { method: 'POST', body: JSON.stringify(body) })
 
+export interface SavedBriefing {
+  briefing: Briefing
+  created_at: string
+  stale: boolean // source data was refreshed after this briefing was prepared
+  reviews: Record<string, 'accept' | 'reject'>
+  created_suggestions: string[]
+}
+
+export interface HistoryItem {
+  briefing_id: string
+  created_at: string
+  stale: boolean
+  claims: number
+  verified: number
+  conflicts: number
+}
+
 export interface StreamHandlers {
   onSection: (section: Section) => void
   onBriefing: (briefing: Briefing) => void
@@ -129,10 +146,26 @@ export const api = {
     owner?: string | null
     due?: string | null
     citations?: string[]
+    briefing_id?: string | null
+    suggestion_id?: string
   }) => post<{ action_id: string }>('/api/actions', action),
+
+  /** The viewer's last saved briefing for this client (or a given version), or null if none. */
+  async latestBriefing(userId: string, clientId: string, briefingId?: string): Promise<SavedBriefing | null> {
+    const version = briefingId ? `&briefing_id=${briefingId}` : ''
+    try {
+      return await request<SavedBriefing>(`/api/briefings/latest?user_id=${userId}&client_id=${clientId}${version}`)
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) return null
+      throw e
+    }
+  },
 
   extractCommitments: (clientId: string, userId: string, text: string) =>
     post<Commitment[]>(`/api/clients/${clientId}/notes`, { user_id: userId, text }),
+
+  history: (userId: string, clientId: string) =>
+    request<HistoryItem[]>(`/api/briefings/history?user_id=${userId}&client_id=${clientId}`),
 
   dataHealth: () => request<DataHealth>('/api/health/data'),
 }

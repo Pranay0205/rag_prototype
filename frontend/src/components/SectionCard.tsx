@@ -42,10 +42,29 @@ export function SectionCard({ title, section, reviews, onReview, onCite }: Props
   )
 }
 
-/** A claim may quote the same source twice; show one chip per source. */
-function uniqueSources(citations: Citation[]): Citation[] {
-  const seen = new Set<string>()
-  return citations.filter((c) => !seen.has(c.source_id) && seen.add(c.source_id))
+/** Claim text with inline citation markers: "... on 2026-09-01 [1]" -> clickable superscripts. */
+function ClaimText({ claim, onCite }: { claim: Claim; onCite: (c: Citation) => void }) {
+  if (!claim.annotated) return <>{claim.text}</>
+  return (
+    <>
+      {claim.annotated.split(/(\[\d+\])/).map((part, i) => {
+        const n = /^\[(\d+)\]$/.exec(part)?.[1]
+        const citation = n ? claim.citations[Number(n) - 1] : undefined
+        if (!n) return <span key={i}>{part}</span>
+        if (!citation) return null
+        return (
+          <button
+            key={i}
+            onClick={() => onCite(citation)}
+            title={citation.quote ?? citation.snippet}
+            className="mx-[1px] inline-flex h-[15px] min-w-[15px] -translate-y-[5px] items-center justify-center rounded px-1 align-baseline text-[10px] font-semibold tabular-nums text-indigo-700 ring-1 ring-inset ring-indigo-200 transition hover:bg-indigo-600 hover:text-white hover:ring-indigo-600"
+          >
+            {n}
+          </button>
+        )
+      })}
+    </>
+  )
 }
 
 function ClaimRow({
@@ -65,10 +84,12 @@ function ClaimRow({
     <li className={cn('group flex gap-3 py-3.5', rejected && 'opacity-40')}>
       <StatusIcon status={claim.status} />
       <div className="min-w-0 flex-1">
-        <p className={cn('text-[14.5px] leading-relaxed text-slate-800', rejected && 'line-through')}>{claim.text}</p>
+        <p className={cn('text-[14.5px] leading-relaxed text-slate-800', rejected && 'line-through')}>
+          <ClaimText claim={claim} onCite={onCite} />
+        </p>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-          {uniqueSources(claim.citations).map((c) => (
-            <CitationChip key={c.source_id} citation={c} onClick={() => onCite(c)} />
+          {claim.citations.map((c, i) => (
+            <CitationChip key={`${c.source_id}-${i}`} n={i + 1} citation={c} onClick={() => onCite(c)} />
           ))}
           <button
             onClick={() => setOpen((v) => !v)}
@@ -111,7 +132,7 @@ function QuoteList({ citations, onCite }: { citations: Citation[]; onCite: (c: C
               {c.quote ?? <span className="italic text-slate-400">Open the source to read it in full.</span>}
             </blockquote>
             <div className="mt-1 pl-3 text-[11px] text-slate-400">
-              {c.title}
+              <span className="font-semibold tabular-nums text-indigo-600">[{i + 1}]</span> {c.title}
               {c.date && ` · ${c.date}`}
             </div>
           </button>
@@ -152,14 +173,15 @@ function ReviewButton({
   )
 }
 
-export function CitationChip({ citation, onClick }: { citation: Citation; onClick: () => void }) {
+export function CitationChip({ citation, n, onClick }: { citation: Citation; n?: number; onClick: () => void }) {
   const isSql = citation.kind === 'sql'
   return (
     <button
       onClick={onClick}
       title={citation.quote ?? citation.snippet}
-      className="inline-flex max-w-[240px] items-center gap-1.5 text-[11.5px] text-slate-500 transition hover:text-indigo-600"
+      className="inline-flex max-w-[260px] items-center gap-1.5 text-[11.5px] text-slate-500 transition hover:text-indigo-600"
     >
+      {n !== undefined && <span className="font-semibold tabular-nums text-indigo-600">{n}</span>}
       {isSql ? (
         <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6">
           <ellipse cx="10" cy="5" rx="6" ry="2.5" />

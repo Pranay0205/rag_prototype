@@ -138,3 +138,15 @@ def test_ORC_6_uncertainty_may_quote_stale_metric():
     claim = "The prior briefing described TTM relationship revenue as about $4.1M."
     assert check_numbers(claim, [STALE_BRIEFING, SQL_E1], allow_derived=True) == []
     assert check_numbers(claim, [STALE_BRIEFING, SQL_E1]) == ["$4.1M"]  # anywhere else: still flagged
+
+
+def test_EVAL_5_judge_ids_mapped_robustly():
+    from briefing.eval import Judgement, map_verdicts
+
+    def j(*pairs):
+        return Judgement.model_validate({"facts": [{"id": i, "verdict": v} for i, v in pairs]})
+
+    assert map_verdicts(j(("F0", "present"), ("F1", "partial")), 2) == (["present", "partial"], True)
+    assert map_verdicts(j(("0", "present"), ("1", "absent")), 2) == (["present", "absent"], True)
+    assert map_verdicts(j(("fact-a", "partial")), 1) == (["partial"], True)  # order fallback
+    assert map_verdicts(j(("F0", "present")), 2) == (["present", "absent"], False)  # flagged, not silent

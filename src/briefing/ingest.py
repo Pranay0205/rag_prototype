@@ -10,7 +10,7 @@ import json
 import re
 import time
 from collections import Counter
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import yaml
@@ -377,7 +377,10 @@ def run(
     db_path.parent.mkdir(parents=True, exist_ok=True)
     if db_path.exists():
         db_path.unlink()  # idempotent rebuild
-    report: dict = {"today": config.TODAY.isoformat()}
+    report: dict = {
+        "today": config.TODAY.isoformat(),
+        "built_at": datetime.now().isoformat(),
+    }
     conn = connect(db_path)
     with conn:
         load_structured(conn, report)

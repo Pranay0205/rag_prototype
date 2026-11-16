@@ -30,7 +30,9 @@ def main() -> int:
             return 1
         print(f"OK   {'fast  ' if fast else 'strong'} {name}: {r.model_dump()}")
     u = llm.usage
-    print(f"calls={u['calls']} tokens={u['prompt_tokens']}+{u['completion_tokens']} cost=${u['cost_usd']:.5f}")
+    print(
+        f"calls={u['calls']} tokens={u['prompt_tokens']}+{u['completion_tokens']} cost=${u['cost_usd']:.5f}"
+    )
     return 0
 
 

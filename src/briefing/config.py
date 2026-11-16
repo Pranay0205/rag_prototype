@@ -11,7 +11,8 @@ STRUCTURED_DIR = DATA_DIR / "structured"
 DOCS_DIR = DATA_DIR / "docs"
 GOLDEN_DIR = ROOT / "golden"
 VAR_DIR = ROOT / "var"
-DB_PATH = VAR_DIR / "briefing.db"
+DB_PATH = VAR_DIR / "briefing.db"  # source data: rebuilt by every ingestion run
+APP_DB_PATH = VAR_DIR / "app.db"  # user state (briefings, reviews, actions): survives re-ingestion
 MODEL_CACHE = VAR_DIR / "models"
 EMBED_MODEL = "BAAI/bge-small-en-v1.5"
 

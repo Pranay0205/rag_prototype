@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Meeting, User } from '../api'
 import { DataHealthDialog } from './DataHealthDialog'
-import { Avatar, Logo, Wordmark, cn } from './ui'
+import { Avatar, Logo, Wordmark, cn, formatTime } from './ui'
 
 interface Props {
   users: User[]
@@ -61,7 +61,7 @@ export function Sidebar({ users, me, meetings, selectedId, onSelect, onSwitch, o
                   {m.legal_name.replace(/ (Inc\.|plc|LLC)$/, '')}
                 </span>
                 <span className="block text-xs text-slate-500">
-                  {when.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                  {formatTime(when)}
                 </span>
               </span>
             </button>

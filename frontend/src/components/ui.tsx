@@ -17,14 +17,19 @@ export const SECTION_ORDER: { key: SectionKey; title: string }[] = [
   { key: 'uncertainty', title: 'Uncertain, conflicting or unavailable' },
 ]
 
+/** 12-hour time, minutes only when not on the hour: "10 AM", "3 PM", "10:30 AM". */
+export function formatTime(d: Date): string {
+  const hour = d.getHours() % 12 || 12
+  const minutes = d.getMinutes()
+  const suffix = d.getHours() < 12 ? 'AM' : 'PM'
+  return minutes === 0 ? `${hour} ${suffix}` : `${hour}:${String(minutes).padStart(2, '0')} ${suffix}`
+}
+
+/** "Wed, 18 Nov · 10 AM" */
 export function formatMeetingTime(iso: string): string {
-  return new Date(iso).toLocaleString('en-GB', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  const d = new Date(iso)
+  const day = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+  return `${day} · ${formatTime(d)}`
 }
 
 type Tone = 'neutral' | 'accent' | 'good' | 'warn' | 'bad'

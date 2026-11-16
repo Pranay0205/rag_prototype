@@ -25,6 +25,7 @@ export interface Citation {
 export interface Claim {
   id: string
   text: string
+  annotated?: string | null // text with inline markers [n] pointing at citations[n-1]
   citations: Citation[]
   confidence: Confidence
   status: ClaimStatus

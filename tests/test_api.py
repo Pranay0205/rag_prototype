@@ -5,7 +5,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from briefing import ingest, llm
+from briefing import config, ingest, llm
 from briefing.api import Commitments, app
 from briefing.orchestrator import JudgeResult, SectionDraft
 
@@ -45,10 +45,15 @@ def fake_chat_json(system, user, schema, fast=False, **_):
 
 
 @pytest.fixture(scope="module")
-def client():
+def client(tmp_path_factory):
     ingest.run()  # rebuild var/briefing.db so tests start from the known data pack
+    real_app_db = config.APP_DB_PATH
+    config.APP_DB_PATH = (
+        tmp_path_factory.mktemp("app") / "app.db"
+    )  # never write test briefings to the real app db
     with TestClient(app) as c:
         yield c
+    config.APP_DB_PATH = real_app_db
 
 
 @pytest.fixture(autouse=True)
@@ -133,3 +138,69 @@ def test_API_9_commitments_grounded_in_notes(client):
 def test_API_10_data_health(client):
     report = client.get("/api/health/data").json()
     assert report["merges"] == [{"merged_id": "C-007", "survivor_id": "C-002"}]
+
+
+def test_API_11_briefing_saved_with_reviews_and_owner_only(client):
+    briefing_id = client.post("/api/briefings", json={"user_id": "alex", "client_id": "C-003"}).json()[
+        "briefing_id"
+    ]
+    sse_events(client, briefing_id)
+    claim_id = client.get(f"/api/briefings/{briefing_id}", params={"user_id": "alex"}).json()["sections"][0][
+        "claims"
+    ][0]["id"]
+    assert (
+        client.post(
+            f"/api/briefings/{briefing_id}/claims/{claim_id}/review",
+            json={"user_id": "alex", "decision": "reject"},
+        ).status_code
+        == 200
+    )
+    client.post(
+        "/api/actions",
+        json={
+            "user_id": "alex",
+            "client_id": "C-003",
+            "kind": "follow_up",
+            "description": "x",
+            "briefing_id": briefing_id,
+            "suggestion_id": "overdue-A-301",
+        },
+    )
+
+    latest = client.get("/api/briefings/latest", params={"user_id": "alex", "client_id": "C-003"}).json()
+    assert latest["briefing"]["briefing_id"] == briefing_id and latest["stale"] is False
+    assert latest["reviews"] == {claim_id: "reject"} and latest["created_suggestions"] == ["overdue-A-301"]
+
+    # never served to another user: sam has no saved Cascade briefing of his own
+    assert (
+        client.get("/api/briefings/latest", params={"user_id": "sam", "client_id": "C-003"}).status_code
+        == 404
+    )
+    assert client.get(f"/api/briefings/{briefing_id}", params={"user_id": "sam"}).status_code == 403
+
+
+def test_API_11_saved_briefing_marked_stale_after_reingestion(client):
+    briefing_id = client.post("/api/briefings", json={"user_id": "sam", "client_id": "C-001"}).json()[
+        "briefing_id"
+    ]
+    sse_events(client, briefing_id)
+    ingest.run()  # data refreshed after the briefing was prepared
+    latest = client.get("/api/briefings/latest", params={"user_id": "sam", "client_id": "C-001"}).json()
+    assert latest["stale"] is True
+
+
+def test_API_12_history_lists_own_versions_newest_first(client):
+    ids = []
+    for _ in range(2):
+        b = client.post("/api/briefings", json={"user_id": "kim", "client_id": "C-002"}).json()["briefing_id"]
+        sse_events(client, b)
+        ids.append(b)
+    history = client.get("/api/briefings/history", params={"user_id": "kim", "client_id": "C-002"}).json()
+    assert [h["briefing_id"] for h in history][:2] == ids[::-1]
+    older = client.get(
+        "/api/briefings/latest", params={"user_id": "kim", "client_id": "C-002", "briefing_id": ids[0]}
+    ).json()
+    assert older["briefing"]["briefing_id"] == ids[0]
+    # alex covers Helios too, but never sees kim's versions
+    alex = client.get("/api/briefings/history", params={"user_id": "alex", "client_id": "C-002"}).json()
+    assert not set(ids) & {h["briefing_id"] for h in alex}

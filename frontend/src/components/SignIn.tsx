@@ -29,8 +29,11 @@ export function SignIn({ users, onSignIn }: Props) {
 
       <div className="relative flex h-full flex-col items-center">
         <div className="mt-[10vh] text-center">
-          <div className="text-7xl font-extralight tabular-nums tracking-tight">
-            {now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+          <div className="flex items-baseline justify-center gap-2 font-extralight tracking-tight">
+            <span className="text-7xl tabular-nums">
+              {now.getHours() % 12 || 12}:{String(now.getMinutes()).padStart(2, '0')}
+            </span>
+            <span className="text-2xl text-slate-300">{now.getHours() < 12 ? 'AM' : 'PM'}</span>
           </div>
           <div className="mt-2 text-lg font-light text-slate-300">
             {now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}

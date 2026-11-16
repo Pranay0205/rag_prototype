@@ -1,7 +1,8 @@
 // Briefing Desk: prepare -> review -> act -> close the loop (specs/05-api-ui.md).
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ApiError, api, type Meeting, type User } from './api'
+import { ApiError, api, type HistoryItem, type Meeting, type User } from './api'
 import { AttentionPanel, type ActionState } from './components/AttentionPanel'
+import { HistoryMenu } from './components/HistoryMenu'
 import { NotesCapture } from './components/NotesCapture'
 import { SectionCard, type Review } from './components/SectionCard'
 import { Sidebar } from './components/Sidebar'
@@ -18,6 +19,8 @@ type Run = {
   error: string | null
   startedAt: number
   seconds: number | null
+  savedAt: string | null // set when the briefing was loaded from history
+  stale: boolean
 }
 
 const SESSION_KEY = 'briefing-desk.user'
@@ -30,6 +33,8 @@ const IDLE: Run = {
   error: null,
   startedAt: 0,
   seconds: null,
+  savedAt: null,
+  stale: false,
 }
 
 export default function App() {
@@ -48,6 +53,7 @@ export default function App() {
   const [reviews, setReviews] = useState<Record<string, Review>>({})
   const [actionStates, setActionStates] = useState<Record<string, ActionState>>({})
   const [drawer, setDrawer] = useState<Citation | null>(null)
+  const [history, setHistory] = useState<HistoryItem[]>([])
   const [copied, setCopied] = useState(false)
   const closeStream = useRef<(() => void) | null>(null)
 
@@ -73,14 +79,42 @@ export default function App() {
     if (userId) api.meetings(userId).then(setMeetings)
   }, [userId])
 
-  const selectMeeting = useCallback((m: Meeting) => {
-    closeStream.current?.()
-    setMeeting(m)
-    setRun(IDLE)
-    setReviews({})
-    setActionStates({})
-    setView('briefing')
-  }, [])
+  const openSaved = useCallback(
+    (m: Meeting, briefingId?: string) => {
+      if (!userId) return
+      api.history(userId, m.client_id).then(setHistory)
+      // API-11/12: reopen a briefing this user prepared, with their reviews and actions
+      api.latestBriefing(userId, m.client_id, briefingId).then((saved) => {
+        if (!saved) return
+        setRun({
+          ...IDLE,
+          status: 'done',
+          briefingId: saved.briefing.briefing_id,
+          briefing: saved.briefing,
+          sections: Object.fromEntries(saved.briefing.sections.map((s) => [s.key, s])),
+          savedAt: saved.created_at,
+          stale: saved.stale,
+        })
+        setReviews(saved.reviews)
+        setActionStates(Object.fromEntries(saved.created_suggestions.map((id) => [id, 'created' as const])))
+      })
+    },
+    [userId],
+  )
+
+  const selectMeeting = useCallback(
+    (m: Meeting) => {
+      closeStream.current?.()
+      setMeeting(m)
+      setRun(IDLE)
+      setReviews({})
+      setActionStates({})
+      setHistory([])
+      setView('briefing')
+      openSaved(m)
+    },
+    [openSaved],
+  )
 
   async function prepare() {
     if (!meeting || !userId) return
@@ -95,8 +129,10 @@ export default function App() {
       setRun((r) => ({ ...r, briefingId: briefing_id }))
       closeStream.current = api.streamBriefing(briefing_id, {
         onSection: (s) => setRun((r) => ({ ...r, sections: { ...r.sections, [s.key]: s } })),
-        onBriefing: (b) =>
-          setRun((r) => ({ ...r, status: 'done', briefing: b, seconds: (Date.now() - r.startedAt) / 1000 })),
+        onBriefing: (b) => {
+          setRun((r) => ({ ...r, status: 'done', briefing: b, seconds: (Date.now() - r.startedAt) / 1000 }))
+          api.history(userId, meeting.client_id).then(setHistory) // the new version is now saved
+        },
         onError: (message) => setRun((r) => ({ ...r, status: 'error', error: message })),
       })
     } catch (e) {
@@ -119,6 +155,8 @@ export default function App() {
         owner: action.owner,
         due: action.due,
         citations: action.citations.map((c) => c.source_id),
+        briefing_id: run.briefingId,
+        suggestion_id: action.id,
       })
     }
     setActionStates((s) => ({ ...s, [action.id]: state }))
@@ -159,6 +197,8 @@ export default function App() {
               onView={setView}
               onCopy={copyMarkdown}
               copied={copied}
+              history={history}
+              onOpenVersion={(id) => openSaved(meeting, id)}
             />
 
             {view === 'notes' ? (
@@ -212,6 +252,8 @@ function MeetingHeader({
   onView,
   onCopy,
   copied,
+  history,
+  onOpenVersion,
 }: {
   meeting: Meeting
   run: Run
@@ -220,6 +262,8 @@ function MeetingHeader({
   onView: (v: 'briefing' | 'notes') => void
   onCopy: () => void
   copied: boolean
+  history: HistoryItem[]
+  onOpenVersion: (briefingId: string) => void
 }) {
   const done = Object.keys(run.sections).length
   return (
@@ -249,7 +293,17 @@ function MeetingHeader({
         <div className="flex items-center gap-3">
           {run.status === 'done' && view === 'briefing' && (
             <>
-              <span className="text-xs tabular-nums text-slate-400">{run.seconds?.toFixed(1)}s</span>
+              {run.stale && (
+                <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
+                  Data updated since
+                </span>
+              )}
+              <HistoryMenu
+                label={run.savedAt ? `Prepared ${timeAgo(run.savedAt)}` : `Prepared in ${run.seconds?.toFixed(1)}s`}
+                items={history}
+                currentId={run.briefingId}
+                onOpen={onOpenVersion}
+              />
               <button
                 onClick={onCopy}
                 className="rounded-full px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
@@ -288,6 +342,15 @@ function IdleState({ onPrepare }: { onPrepare: () => void }) {
   )
 }
 
+function timeAgo(iso: string): string {
+  const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60_000)
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes} min ago`
+  const hours = Math.round(minutes / 60)
+  if (hours < 24) return `${hours} h ago`
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+}
+
 function greeting(): string {
   const h = new Date().getHours()
   return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
@@ -316,7 +379,8 @@ function toMarkdown(b: Briefing, reviews: Record<string, Review>): string {
     for (const c of s.claims) {
       if (reviews[c.id] === 'reject') continue
       const flag = c.status === 'verified' ? '' : ' (unverified)'
-      lines.push(`- ${c.text}${flag} [${c.citations.map((x) => x.source_id).join(', ')}]`)
+      lines.push(`- ${c.annotated ?? c.text}${flag}`)
+      c.citations.forEach((x, i) => lines.push(`  - [${i + 1}] ${x.title} (${x.source_id})`))
     }
     lines.push('')
   }

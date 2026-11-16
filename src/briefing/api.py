@@ -19,7 +19,7 @@ from pydantic import BaseModel
 
 from briefing import config, llm, orchestrator, prompts
 from briefing.db import connect, jlist, rows
-from briefing.schemas import Briefing
+from briefing.schemas import Briefing, Viewer
 from briefing.tools import ToolResult, Tools, can_see
 
 HTTP_STATUS = {
@@ -56,24 +56,49 @@ def viewer_or_404(t: Tools, user_id: str):
     return v
 
 
-@asynccontextmanager
-async def lifespan(_: FastAPI):
-    with connect() as conn:  # app-owned tables survive restarts (ingestion rebuilds only the source tables)
-        conn.execute(
+def app_db():
+    """User state lives in its own database so re-running ingestion never wipes it (API-11)."""
+    return connect(config.APP_DB_PATH)
+
+
+def init_app_db() -> None:
+    with app_db() as conn:
+        conn.executescript(
             """
+            CREATE TABLE IF NOT EXISTS briefings (
+                briefing_id TEXT PRIMARY KEY, user_id TEXT, client_id TEXT, meeting_id TEXT,
+                created_at TEXT, data_built_at TEXT, json TEXT
+            );
+            CREATE INDEX IF NOT EXISTS briefings_owner ON briefings (user_id, client_id, created_at);
             CREATE TABLE IF NOT EXISTS claim_reviews (
                 briefing_id TEXT, claim_id TEXT, user_id TEXT, decision TEXT, note TEXT, at TEXT
-            )
-            """
-        )
-        conn.execute(
-            """
+            );
             CREATE TABLE IF NOT EXISTS created_actions (
                 id TEXT PRIMARY KEY, client_id TEXT, kind TEXT, description TEXT, owner TEXT,
-                due TEXT, citations TEXT, created_by TEXT, at TEXT
-            )
+                due TEXT, citations TEXT, created_by TEXT, at TEXT, briefing_id TEXT, suggestion_id TEXT
+            );
             """
         )
+
+
+def data_built_at() -> str | None:
+    path = config.VAR_DIR / "ingestion_report.json"
+    return json.loads(path.read_text()).get("built_at") if path.exists() else None
+
+
+def load_owned(briefing_id: str, user_id: str) -> dict:
+    """A saved briefing, only for its owner: briefings reflect one viewer's entitlements."""
+    r = rows(app_db(), "SELECT * FROM briefings WHERE briefing_id=?", (briefing_id,))
+    if not r:
+        raise HTTPException(404, {"code": "NOT_FOUND", "message": "Briefing not found"})
+    if r[0]["user_id"] != user_id:
+        raise HTTPException(403, {"code": "FORBIDDEN", "message": "Briefing belongs to another user"})
+    return r[0]
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    init_app_db()
     from briefing.embeddings import embed_queries
 
     embed_queries(["warm up"])  # load the embedding model once, not on the first briefing
@@ -165,6 +190,12 @@ def start_briefing(req: BriefingRequest):
                 tools(), req.user_id, client_id, on_event=emit, briefing_id=briefing_id
             )
             job.briefing = b
+            with app_db() as conn:  # API-11: keep what the banker was shown
+                conn.execute(
+                    "INSERT INTO briefings VALUES (?,?,?,?,?,?,?)",
+                    (b.briefing_id, req.user_id, client_id, req.meeting_id, datetime.now().isoformat(),
+                     data_built_at(), b.model_dump_json()),
+                )  # fmt: skip
             emit("briefing", b.model_dump(mode="json"))
         except Exception as e:  # noqa: BLE001 - reported to the client as an error event
             emit("error", {"message": str(e)})
@@ -202,16 +233,82 @@ def stream(briefing_id: str):
     return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
 
 
+def _same_access(b: Briefing, viewer) -> bool:
+    """A saved briefing is only shown if it was generated under the viewer's current access:
+    otherwise it may hold content they can no longer see."""
+    return (b.viewer.clearance, sorted(b.viewer.groups)) == (viewer.clearance, sorted(viewer.groups))
+
+
+def _saved_rows(t: Tools, user_id: str, client_id: str) -> tuple[Viewer, list[dict]]:
+    viewer = viewer_or_404(t, user_id)
+    raise_for(t.get_client_profile(viewer, client_id))  # coverage re-checked at read time
+    saved = rows(
+        app_db(),
+        "SELECT * FROM briefings WHERE user_id=? AND client_id=? ORDER BY created_at DESC",
+        (user_id, t._cid(client_id)),
+    )
+    return viewer, saved
+
+
+@app.get("/api/briefings/history")
+def briefing_history(user_id: str, client_id: str):
+    """API-12: the viewer's saved briefings for a client, newest first."""
+    viewer, saved = _saved_rows(tools(), user_id, client_id)
+    current_data = data_built_at()
+    out = []
+    for r in saved:
+        b = Briefing.model_validate_json(r["json"])
+        if not _same_access(b, viewer):
+            continue
+        claims = [c for s in b.sections for c in s.claims]
+        out.append(
+            {
+                "briefing_id": b.briefing_id,
+                "created_at": r["created_at"],
+                "stale": r["data_built_at"] != current_data,
+                "claims": len(claims),
+                "verified": sum(c.status == "verified" for c in claims),
+                "conflicts": len(b.conflicts),
+            }
+        )
+    return out
+
+
+@app.get("/api/briefings/latest")
+def latest_briefing(user_id: str, client_id: str, briefing_id: str | None = None):
+    """API-11: the viewer's most recent saved briefing for a client (or the version `briefing_id`),
+    with their reviews and created actions. Coverage and access are re-checked at read time."""
+    viewer, saved = _saved_rows(tools(), user_id, client_id)
+    if briefing_id:
+        saved = [r for r in saved if r["briefing_id"] == briefing_id]
+    for r in saved:
+        b = Briefing.model_validate_json(r["json"])
+        if _same_access(b, viewer):
+            break
+    else:
+        raise HTTPException(404, {"code": "NOT_FOUND", "message": "No saved briefing"})
+    conn = app_db()
+    reviews = {
+        x["claim_id"]: x["decision"]
+        for x in rows(conn, "SELECT * FROM claim_reviews WHERE briefing_id=? ORDER BY at", (b.briefing_id,))
+    }
+    created = [
+        x["suggestion_id"]
+        for x in rows(conn, "SELECT suggestion_id FROM created_actions WHERE briefing_id=?", (b.briefing_id,))
+        if x["suggestion_id"]
+    ]
+    return {
+        "briefing": b,
+        "created_at": r["created_at"],
+        "stale": r["data_built_at"] != data_built_at(),
+        "reviews": reviews,
+        "created_suggestions": created,
+    }
+
+
 @app.get("/api/briefings/{briefing_id}")
 def get_briefing(briefing_id: str, user_id: str):
-    job = JOBS.get(briefing_id)
-    if job is None or job.briefing is None:
-        raise HTTPException(404, {"code": "NOT_FOUND", "message": "Briefing not found or not finished"})
-    if (
-        job.user_id != user_id
-    ):  # briefings are entitlement-specific; never hand one user's briefing to another
-        raise HTTPException(403, {"code": "FORBIDDEN", "message": "Briefing belongs to another user"})
-    return job.briefing
+    return Briefing.model_validate_json(load_owned(briefing_id, user_id)["json"])
 
 
 # ---------------------------------------------------------------- API-6 source drawer
@@ -275,10 +372,8 @@ class Review(BaseModel):
 
 @app.post("/api/briefings/{briefing_id}/claims/{claim_id}/review")
 def review(briefing_id: str, claim_id: str, r: Review):
-    job = JOBS.get(briefing_id)
-    if job is None or job.user_id != r.user_id:
-        raise HTTPException(404, {"code": "NOT_FOUND", "message": "Unknown briefing"})
-    with connect() as conn:
+    load_owned(briefing_id, r.user_id)
+    with app_db() as conn:
         conn.execute(
             "INSERT INTO claim_reviews VALUES (?,?,?,?,?,?)",
             (briefing_id, claim_id, r.user_id, r.decision, r.note, datetime.now().isoformat()),
@@ -294,6 +389,8 @@ class NewAction(BaseModel):
     owner: str | None = None
     due: str | None = None
     citations: list[str] = []
+    briefing_id: str | None = None
+    suggestion_id: str | None = None
 
 
 @app.post("/api/actions")
@@ -301,9 +398,9 @@ def create_action(a: NewAction):
     t = tools()
     raise_for(t.get_client_profile(viewer_or_404(t, a.user_id), a.client_id))  # coverage check
     action_id = f"N-{uuid.uuid4().hex[:6]}"
-    with connect() as conn:
+    with app_db() as conn:
         conn.execute(
-            "INSERT INTO created_actions VALUES (?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO created_actions VALUES (?,?,?,?,?,?,?,?,?,?,?)",
             (
                 action_id,
                 a.client_id,
@@ -314,6 +411,8 @@ def create_action(a: NewAction):
                 json.dumps(a.citations),
                 a.user_id,
                 datetime.now().isoformat(),
+                a.briefing_id,
+                a.suggestion_id,
             ),
         )
     return {"action_id": action_id}
