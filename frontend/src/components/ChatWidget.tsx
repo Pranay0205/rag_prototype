@@ -2,7 +2,7 @@
 // pipeline, so it carries inline citations and Verified / Check sources tags, or says what the data
 // lacks. Conversations are kept per client while the app is open.
 import { useEffect, useRef, useState } from 'react'
-import { ApiError, api, type AskAnswer } from '../api'
+import { ApiError, api, type AskAnswer, type ClientSearch } from '../api'
 import type { Citation } from '../types'
 import { ClaimText, VerificationTag } from './SectionCard'
 import { cn, readable } from './ui'
@@ -28,6 +28,8 @@ export function ChatWidget({ userId, clients, currentClientId, onCite }: Props) 
   const [clientId, setClientId] = useState<string | null>(currentClientId)
   const [threads, setThreads] = useState<Record<string, Turn[]>>({})
   const [text, setText] = useState('')
+  const [pending, setPending] = useState<string | null>(null) // asked before a client was chosen
+  const [detected, setDetected] = useState<ClientSearch['results'][number] | null>(null) // named in the text
   const scroller = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLInputElement>(null)
 
@@ -58,10 +60,37 @@ export function ChatWidget({ userId, clients, currentClientId, onCite }: Props) 
     return () => window.removeEventListener('keydown', esc)
   }, [open])
 
-  async function ask(question: string) {
+  /** The one covered client a question names ("What is overdue for NWL?"), via API-13, or null. */
+  async function clientNamedIn(question: string): Promise<ClientSearch['results'][number] | null> {
+    if (question.trim().length < 3) return null
+    const { results } = await api.searchClients(userId, question)
+    return results.length === 1 ? results[0] : null
+  }
+
+  // Search while typing: show which client the question is about before it is sent.
+  useEffect(() => {
+    let live = true
+    const t = setTimeout(() => clientNamedIn(text).then((c) => live && setDetected(c)), 250)
+    return () => {
+      live = false
+      clearTimeout(t)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text, userId])
+
+  async function ask(question: string, forClient?: string) {
     const q = question.trim()
-    if (!q || busy || !clientId) return
-    const cid = clientId
+    if (!q || busy) return
+    // a client named in the question wins; then the one in view; then ask which
+    const named = forClient ? null : (detected ?? (await clientNamedIn(q)))
+    const cid = forClient ?? named?.client_id ?? clientId
+    if (!cid) {
+      setPending(q) // keep the question and ask which client it is about
+      setText('')
+      return
+    }
+    setPending(null)
+    setClientId(cid)
     const id = Date.now()
     const started = performance.now()
     const update = (patch: Partial<Turn>) =>
@@ -126,10 +155,21 @@ export function ChatWidget({ userId, clients, currentClientId, onCite }: Props) 
       </header>
 
       <div ref={scroller} className="flex-1 space-y-4 overflow-y-auto bg-slate-50/60 px-4 py-4">
+        {pending && (
+          <div className="flex justify-end">
+            <p className="max-w-[85%] rounded-2xl rounded-br-md bg-indigo-600 px-3.5 py-2 text-[13.5px] leading-snug text-white">
+              {pending}
+            </p>
+          </div>
+        )}
         {turns.length === 0 && (
-          <div className="pt-6 text-center">
+          <div className={cn('text-center', pending ? 'pt-1' : 'pt-6')}>
             <p className="text-sm font-medium text-slate-700">
-              {client ? `Ask anything about ${shortName(client.name)}` : 'Choose a client to start'}
+              {pending
+                ? 'Which client is this about?'
+                : client
+                  ? `Ask anything about ${shortName(client.name)}`
+                  : 'Ask about any client you cover'}
             </p>
             <p className="mx-auto mt-1 max-w-[280px] text-[12px] leading-snug text-slate-400">
               Answers use only sources you are cleared for, are cited inline and checked like the briefing.
@@ -139,7 +179,7 @@ export function ChatWidget({ userId, clients, currentClientId, onCite }: Props) 
                 {clients.map((c) => (
                   <button
                     key={c.client_id}
-                    onClick={() => setClientId(c.client_id)}
+                    onClick={() => (pending ? ask(pending, c.client_id) : setClientId(c.client_id))}
                     className="rounded-full bg-white px-3.5 py-1.5 text-[13px] font-medium text-slate-700 ring-1 ring-slate-200 transition hover:bg-indigo-50 hover:text-indigo-700 hover:ring-indigo-200"
                   >
                     {c.name}
@@ -175,6 +215,15 @@ export function ChatWidget({ userId, clients, currentClientId, onCite }: Props) 
         ))}
       </div>
 
+      {detected && detected.client_id !== clientId && (
+        <div className="flex items-center gap-1.5 border-t border-slate-100 bg-indigo-50/60 px-4 py-1.5 text-[12px] text-indigo-700">
+          <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <path d="M9 15A6 6 0 1 0 9 3a6 6 0 0 0 0 12Zm8 2-3.8-3.8" strokeLinecap="round" />
+          </svg>
+          About <span className="font-semibold">{detected.name}</span>
+          {detected.matched_alias && <span className="text-indigo-400">(from "{detected.matched_alias}")</span>}
+        </div>
+      )}
       <form
         onSubmit={(e) => {
           e.preventDefault()
@@ -186,14 +235,13 @@ export function ChatWidget({ userId, clients, currentClientId, onCite }: Props) 
           ref={input}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          disabled={!client}
-          placeholder={client ? 'Ask a question' : 'Choose a client first'}
+          placeholder={client ? 'Ask a question' : 'Ask a question, e.g. what is overdue for Northwind?'}
           aria-label="Your question"
           className="h-10 flex-1 rounded-xl bg-slate-100/80 px-3.5 text-[14px] text-slate-800 outline-none ring-1 ring-transparent transition placeholder:text-slate-400 focus:bg-white focus:ring-indigo-300 disabled:opacity-60"
         />
         <button
           type="submit"
-          disabled={!text.trim() || busy || !client}
+          disabled={!text.trim() || busy}
           aria-label="Send"
           className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-600 text-white transition hover:bg-indigo-500 disabled:opacity-40"
         >

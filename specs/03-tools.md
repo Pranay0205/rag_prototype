@@ -53,7 +53,7 @@ as `UNAVAILABLE` with the exception logged.
 | TOOL-10 | `get_interactions(viewer, client_id, limit)` | interaction log + `last_interaction_date` | Defines the "since" cut-off for changes |
 | TOOL-11 | `search_documents(viewer, client_id, queries, doc_types=None, since=None, k=8)` | ranked chunks | `queries` is one string or a list; each query is ranked by BM25 and by vector similarity, and all rankings are fused with reciprocal-rank fusion (query embeddings batched). Candidate set = chunks linked to the client **plus** unlinked `research` / `product_update` chunks (firm-wide content that supports opportunities); unlinked news is never included (T10). Filters (entitlement, client link, not duplicate, approved, type, date) apply **before** ranking. Chunks carry `derived`, `stale`, `suspected_injection`, `link_method`, `link_confidence` |
 | TOOL-13 | `get_meetings(viewer, client_id=None)` | upcoming meetings in the viewer's coverage | Used by ORC-1 (meeting header) and API-2 |
-| TOOL-14 | `search_clients(viewer, query)` | search-as-you-type over covered clients by legal name or alias; falls back to TOOL-4 | A match outside coverage is reported without naming the client (API-13) |
+| TOOL-14 | `search_clients(viewer, query)` | covered clients from free text: a typed prefix of a legal name or alias, or a name mentioned inside a sentence ("overdue for NWL?"); falls back to TOOL-4 | A match outside coverage is reported without naming the client (API-13) |
 | TOOL-12 | MCP exposure | — | Extension: same functions registered as MCP tools; not in v1 |
 
 ## Tests (`tests/test_tools.py`)

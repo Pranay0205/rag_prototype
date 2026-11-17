@@ -62,6 +62,11 @@ def _usd(v: float | int | None) -> str:
     return "n/a" if v is None else f"${v:,.0f}"
 
 
+def _mentions(text: str, name: str) -> bool:
+    """`name` appears in `text` as whole words, case-insensitively ("nwl?" mentions "NWL")."""
+    return len(name) >= 3 and re.search(rf"\b{re.escape(name.lower())}\b", text) is not None
+
+
 def can_see(viewer: Viewer, classification: str, access_groups: list[str]) -> bool:
     """DATA-1: classification <= clearance, and group membership when the record has groups.
     Restricted records are visible only through group membership."""
@@ -197,10 +202,11 @@ class Tools:
     # ------------------------------------------------------------ TOOL-14
 
     def search_clients(self, viewer: Viewer, query: str) -> ToolResult:
-        """TOOL-14: search-as-you-type over the viewer's coverage, by legal name or alias. When
-        nothing in coverage matches, falls back to TOOL-4 (fuzzy and alias resolution), which says
-        a match is outside coverage without naming it. Not wrapped in @tool: its argument is free
-        text, not a client_id, and coverage is applied to every result below."""
+        """TOOL-14: find covered clients from free text, by legal name or alias. Matches a typed prefix
+        ("north") or a name mentioned inside a sentence ("what is overdue for NWL?"). When nothing in
+        coverage matches, falls back to TOOL-4 (fuzzy and alias resolution), which says a match is
+        outside coverage without naming it. Not wrapped in @tool: its argument is free text, not a
+        client_id, and coverage is applied to every result below."""
         q = " ".join(query.split()).lower()
         if not q:
             return ToolResult(ok=True, data=[])
@@ -211,16 +217,12 @@ class Tools:
         for c in clients:
             if c["client_id"] not in covered:
                 continue
+            own = [a["alias"] for a in aliases if a["client_id"] == c["client_id"]]
             via = None
             if q not in c["legal_name"].lower():
-                via = next(
-                    (
-                        a["alias"]
-                        for a in aliases
-                        if a["client_id"] == c["client_id"] and q in a["alias"].lower()
-                    ),
-                    None,
-                )
+                via = next((a for a in own if q in a.lower()), None)  # typed prefix of an alias
+                if via is None:  # the client is named somewhere in a sentence
+                    via = next((a for a in [c["legal_name"], *own] if _mentions(q, a)), None)
                 if via is None:
                     continue
             out.append({"client_id": c["client_id"], "name": c["legal_name"], "matched_alias": via})

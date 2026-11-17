@@ -220,6 +220,9 @@ def test_API_13_search_by_name_or_alias_within_coverage(client):
     assert [r["client_id"] for r in search("alex", "north")["results"]] == ["C-001"]
     nwl = search("alex", "NWL")["results"]
     assert nwl[0]["client_id"] == "C-001" and nwl[0]["matched_alias"] == "NWL"
+    in_sentence = search("alex", "What is overdue for NWL?")["results"]  # named inside a question
+    assert [r["client_id"] for r in in_sentence] == ["C-001"]
+    assert search("alex", "what changed at helios lately")["results"][0]["client_id"] == "C-002"
     outside = search("kim", "Northwind")  # kim covers Helios only
     assert outside["results"] == [] and "outside your coverage" in outside["notice"]
     assert "Northwind" not in json.dumps(outside)  # the notice never names the client

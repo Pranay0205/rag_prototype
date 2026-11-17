@@ -84,8 +84,10 @@ company search box was tried and removed: the home cards list every covered clie
 picks its client. API-13 remains available. Browser Back / Forward and reload follow the open
 meeting (`#/meeting/<id>`); the briefing page has a Home link.
 
-**UI-13 Ask chat:** a floating chat on every page (bottom right). It follows the briefing on
-screen; on the home page the user picks a covered client. Suggested questions; each answer shows
+**UI-13 Ask chat:** a floating chat on every page (bottom right). Typing is never blocked. While
+the user types, the client named in the question is detected (API-13, aliases included) and shown
+("About Northwind Logistics, from NWL"); otherwise the client on screen is used; with neither, the
+chat keeps the question and asks which client it is about. Suggested questions; each answer shows
 inline citations, Verified / Check sources per claim and what the data does not contain.
 Conversations are kept per client while the app is open.
 
