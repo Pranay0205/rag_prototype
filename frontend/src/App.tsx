@@ -1,8 +1,8 @@
 // Briefing Desk: prepare -> review -> act -> close the loop (specs/05-api-ui.md).
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError, api, type HistoryItem, type Meeting, type User } from './api'
-import { AskPanel } from './components/AskPanel'
 import { AttentionPanel, type ActionState } from './components/AttentionPanel'
+import { ChatWidget } from './components/ChatWidget'
 import { HistoryMenu } from './components/HistoryMenu'
 import { ContactsExhibit, PipelineExhibit, RevenueExhibit } from './components/Exhibits'
 import { HomeDashboard } from './components/HomeDashboard'
@@ -39,7 +39,7 @@ type Run = {
   stale: boolean
 }
 
-type View = 'briefing' | 'notes' | 'ask'
+type View = 'briefing' | 'notes'
 
 // The URL hash names the open meeting (#/meeting/M-901), so browser Back, Forward and reload work.
 const MEETING_HASH = /^#\/meeting\/(.+)$/
@@ -261,7 +261,6 @@ export default function App() {
         users={users}
         me={me}
         onHome={goHome}
-        onOpenClient={openClient}
         onSwitch={setUserId}
         onSignOut={() => setUserId(null)}
       />
@@ -298,8 +297,6 @@ export default function App() {
 
               {view === 'notes' ? (
                 <NotesCapture clientId={meeting.client_id} userId={userId} />
-              ) : view === 'ask' ? (
-                <AskPanel key={meeting.client_id} clientId={meeting.client_id} userId={userId} onCite={setDrawer} />
               ) : (
                 <>
                   {run.status === 'error' && (
@@ -347,6 +344,13 @@ export default function App() {
         )}
 
       </div>
+
+      <ChatWidget
+        userId={userId}
+        clients={[...new Map(meetings.map((m) => [m.client_id, { client_id: m.client_id, name: m.legal_name }])).values()]}
+        currentClientId={meeting?.client_id ?? null}
+        onCite={setDrawer}
+      />
 
       {drawer && <SourceDrawer citation={drawer} userId={userId} onClose={() => setDrawer(null)} />}
     </div>
@@ -400,7 +404,7 @@ function MeetingHeader({
 
       <div className="mt-6 flex items-center justify-between">
         <div className="inline-flex rounded-full bg-slate-100 p-1 text-sm">
-          {(['briefing', 'ask', 'notes'] as const).map((v) => (
+          {(['briefing', 'notes'] as const).map((v) => (
             <button
               key={v}
               onClick={() => onView(v)}
@@ -409,7 +413,7 @@ function MeetingHeader({
                 view === v ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800',
               )}
             >
-              {{ briefing: 'Briefing', ask: 'Ask', notes: 'After the meeting' }[v]}
+              {v === 'briefing' ? 'Briefing' : 'After the meeting'}
               {v === 'briefing' && run.status === 'done' && <ReviewProgress reviewed={reviewed} total={total} />}
             </button>
           ))}

@@ -119,12 +119,6 @@ export interface HomeData {
   }[]
 }
 
-/** API-13 */
-export interface ClientSearch {
-  results: { client_id: string; name: string; matched_alias: string | null }[]
-  notice: string | null
-}
-
 /** API-14 (ORC-15) */
 export interface AskAnswer {
   ask_id: string
@@ -217,9 +211,6 @@ export const api = {
   dataHealth: () => request<DataHealth>('/api/health/data'),
 
   home: (userId: string) => request<HomeData>(`/api/home?user_id=${userId}`),
-
-  searchClients: (userId: string, q: string) =>
-    request<ClientSearch>(`/api/clients/search?user_id=${userId}&q=${encodeURIComponent(q)}`),
 
   ask: (clientId: string, userId: string, question: string) =>
     post<AskAnswer>(`/api/clients/${clientId}/ask`, { user_id: userId, question }),

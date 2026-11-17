@@ -55,7 +55,7 @@ export function SectionCard({ title, exhibit, section, reviews, onReview, onCite
 }
 
 /** Claim text with inline citation markers: "... on 30 Sep 2026 [1]" -> clickable superscripts. */
-function ClaimText({ claim, onCite }: { claim: Claim; onCite: (c: Citation) => void }) {
+export function ClaimText({ claim, onCite }: { claim: Claim; onCite: (c: Citation) => void }) {
   if (!claim.annotated) return <>{readable(claim.text)}</>
   return (
     <>
@@ -206,7 +206,7 @@ function ClaimRow({
 }
 
 /** ORC-6: the system's own check, labelled in words next to the sources it was checked against. */
-function VerificationTag({ status }: { status: Claim['status'] }) {
+export function VerificationTag({ status }: { status: Claim['status'] }) {
   if (status === 'verified') {
     return (
       <span
