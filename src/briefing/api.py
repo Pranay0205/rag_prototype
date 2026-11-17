@@ -564,6 +564,17 @@ def data_health():
 
 
 # Demo mode: serve the built React app from the same port (npm run build in frontend/)
+class _UI(StaticFiles):
+    """The built UI. index.html is never cached: it names the current hashed bundles, so a cached
+    copy would keep loading an old version after a rebuild. The bundles themselves can be cached."""
+
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        if response.media_type == "text/html":
+            response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 _dist = config.ROOT / "frontend" / "dist"
 if _dist.exists():
-    app.mount("/", StaticFiles(directory=_dist, html=True), name="ui")
+    app.mount("/", _UI(directory=_dist, html=True), name="ui")
