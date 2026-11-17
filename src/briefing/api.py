@@ -327,26 +327,26 @@ def get_briefing(briefing_id: str, user_id: str):
 
 @app.get("/api/sources/{source_id:path}")
 def source(source_id: str, user_id: str):
-    """Full document text for a citation. Entitlement and coverage are re-checked (RT-7)."""
+    """Full document text for a citation. Entitlement and coverage are re-checked (RT-7). A document
+    the viewer may not see gets exactly the same 404 as one that does not exist, so probing IDs
+    cannot confirm that a hidden document exists."""
     if not source_id.startswith("doc:"):
         raise HTTPException(400, {"code": "INVALID_INPUT", "message": "Structured sources are shown inline"})
     doc_id = source_id.removeprefix("doc:").split("#")[0]
     t = tools()
     viewer = viewer_or_404(t, user_id)
     d = rows(t.conn, "SELECT * FROM documents WHERE doc_id=?", (doc_id,))
-    if not d:
-        raise HTTPException(404, {"code": "NOT_FOUND", "message": f"No document {doc_id}"})
-    d = d[0]
     covered = {
         r["client_id"] for r in rows(t.conn, "SELECT client_id FROM coverage WHERE user_id=?", (user_id,))
     }
-    if d["client_id"] and d["client_id"] not in covered:
-        raise HTTPException(
-            403,
-            {"code": "NOT_IN_COVERAGE", "message": "Document belongs to a client outside your coverage"},
-        )
-    if not can_see(viewer, d["classification"], jlist(d["access_groups"])) or d["quarantined"]:
-        raise HTTPException(403, {"code": "FORBIDDEN", "message": "Not available at your access level"})
+    if (
+        not d
+        or (d[0]["client_id"] and d[0]["client_id"] not in covered)
+        or not can_see(viewer, d[0]["classification"], jlist(d[0]["access_groups"]))
+        or d[0]["quarantined"]
+    ):
+        raise HTTPException(404, {"code": "NOT_FOUND", "message": f"No document {doc_id}"})
+    d = d[0]
     chunk = source_id.removeprefix("doc:")
     snippet = rows(t.conn, "SELECT text FROM chunks WHERE chunk_id=?", (chunk,))
     keys = [
@@ -718,7 +718,8 @@ def data_overview(user_id: str):
     """API-19: the data behind the app for the data page (UI-15): each table with its columns, keys,
     links and row count; what unification did (merges with their evidence, aliases, document
     linking); and the ING-12 quality checks with the SQL each one runs. Metadata, counts and IDs
-    only: no record contents, so no entitlement can be bypassed here."""
+    only: no record contents. Tables with per-row access get no row count, since the count itself
+    would reveal hidden rows."""
     viewer_or_404(tools(), user_id)
     path = config.VAR_DIR / "ingestion_report.json"
     if not path.exists():
@@ -728,12 +729,15 @@ def data_overview(user_id: str):
     tables = []
     for name, (group, description, pk) in TABLES.items():
         cols = [c[1] for c in conn.execute(f'PRAGMA table_info("{name}")')]
+        # Where access is decided per row, a count would reveal how many rows are hidden from the
+        # viewer (e.g. 5 opportunities when Sam can see 4), so no count is given.
+        per_row = "access_groups" in cols or name == "chunks"
         tables.append(
             {
                 "name": name,
                 "group": group,
                 "description": description,
-                "rows": conn.execute(f'SELECT COUNT(*) FROM "{name}"').fetchone()[0],
+                "rows": None if per_row else conn.execute(f'SELECT COUNT(*) FROM "{name}"').fetchone()[0],
                 "columns": [
                     {
                         "name": c,

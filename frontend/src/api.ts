@@ -52,7 +52,7 @@ export interface DataOverview {
     name: string
     group: string
     description: string
-    rows: number
+    rows: number | null // null where access is decided per row: a count would reveal hidden rows
     columns: { name: string; role: 'key' | 'link' | 'lineage' | null; references: string | null }[]
   }[]
   merges: {

@@ -355,3 +355,15 @@ def test_ORC_15_app_labels_answered_from_glossary():
 def test_ORC_15_explanation_never_states_figures():
     assert _explanation("TTM means trailing twelve months.") == "TTM means trailing twelve months."
     assert _explanation("Revenue is usually about 3.4M.") is None  # numbers only from SQL (P1)
+
+
+def test_ORC_6_absence_of_evidence_is_not_a_claim(monkeypatch):
+    draft = {
+        "claims": [
+            {"text": "No evidence shows Helios selling any assets.", "cite": [{"id": "E1"}]},
+            {"text": "Relationship revenue is $3,400,000 TTM.", "cite": [{"id": "E1"}]},
+        ]
+    }
+    monkeypatch.setattr(llm, "chat_json", fake_llm(draft))
+    section, *_ = run_section(SECTIONS[0], [Evidence("E1", REVENUE, "sql", REVENUE.snippet)], CONTEXT)
+    assert [c.text for c in section.claims] == ["Relationship revenue is $3,400,000 TTM."]

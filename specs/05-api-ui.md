@@ -23,13 +23,13 @@ Status: DRAFT for review
 | API-3 | `POST /briefings` `{user_id, client_id \| meeting_id}` | Start a briefing; returns `briefing_id` |
 | API-4 | `GET /briefings/{id}/stream` | SSE: `figures` (ORC-13), `exhibits` (ORC-14), then `section`, `briefing`, `error` events |
 | API-5 | `GET /briefings/{id}` | Full `Briefing` JSON (after done) |
-| API-6 | `GET /sources/{source_id}?user_id=` | Full source text for the citation drawer (entitlement re-checked) |
+| API-6 | `GET /sources/{source_id}?user_id=` | Full source text for the citation drawer (entitlement re-checked). A document the viewer may not see returns the same 404 as a missing one, so IDs cannot be probed |
 | API-7 | `POST /briefings/{id}/claims/{claim_id}/review` `{decision: accept\|reject\|clear, note}` | Human review; appended with user + timestamp, latest wins, `clear` undoes. A reject carries a reason in `note` (wrong, outdated, not_relevant) |
 | API-8 | `POST /actions` `{client_id, kind, description, owner, due, citations}` | Create follow-up / flag stale |
 | API-9 | `POST /clients/{id}/notes` `{user_id, text}` | Post-meeting notes → proposed commitments (fast model); returns proposals, nothing saved until confirmed |
 | API-10 | `GET /health/data` | Ingestion report (ING-11) |
 | API-20 | `POST /ask` `{user_id, question}` | A question across every covered client, by agentic search (ORC-16); returns the ORC-15 shape plus `steps` |
-| API-19 | `GET /data/overview?user_id` | The data page (UI-15). Each table with its columns, key, links (by column name: `client_id` → clients, etc.) and row count; merges with their evidence; alias count; document linking; index; ING-12 quality checks with their SQL. Metadata, counts and IDs only, no record contents |
+| API-19 | `GET /data/overview?user_id` | The data page (UI-15). Each table with its columns, key, links (by column name: `client_id` → clients, etc.) and row count (none for tables with per-row access, where a count would reveal hidden rows); merges with their evidence; alias count; document linking; index; ING-12 quality checks with their SQL. Metadata, counts and IDs only, no record contents |
 | API-11 | `GET /briefings/latest?user_id&client_id[&briefing_id]` | The viewer's last saved briefing with their reviews and created actions; `stale` if data was re-ingested since. Saved per viewer, never shared; coverage re-checked on read; not served if the viewer's clearance or groups changed since (must regenerate). User state lives in `var/app.db`, separate from the rebuildable source DB |
 | API-13 | `GET /clients/search?user_id&q` | Company search (TOOL-14); `notice` when only an out-of-coverage client matches |
 | API-14 | `POST /clients/{id}/ask` `{user_id, question}` | Cited, verified answer (ORC-15) |

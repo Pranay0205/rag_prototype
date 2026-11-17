@@ -494,6 +494,15 @@ def build_evidence(
 
 
 _MARKER = re.compile(r"\s*\[(E\d+(?:\s*,\s*E\d+)*)\]")
+# ORC-6: a sentence that only reports what the evidence lacks ("no evidence shows a sale") is not a
+# fact. Records the viewer may not see are left out, so absence from the evidence proves nothing;
+# the gap is reported as an unknown instead. Absence stated from a complete list ("holds no term
+# loan") does not match and stays.
+_ABOUT_EVIDENCE = re.compile(
+    r"\b(no evidence|no record|not in the evidence|evidence (contains|shows|includes) no|"
+    r"does not appear in the evidence|nothing in the evidence)\b",
+    re.IGNORECASE,
+)
 
 
 def _annotate(raw: str, ids: list[str], has_inline: bool) -> tuple[str, str]:
@@ -656,6 +665,11 @@ def run_section(
 
     claims = []
     for c in checked:
+        if _ABOUT_EVIDENCE.search(c["text"]):
+            decisions.append(
+                {"claim_id": c["claim_id"], "text": c["text"], "dropped": "states absence of evidence"}
+            )
+            continue
         verdict = verdicts.get(c["claim_id"], "unavailable")
         verified = verdict == "supported" and not c["bad_numbers"] and not c["tainted"]
         primary = any(

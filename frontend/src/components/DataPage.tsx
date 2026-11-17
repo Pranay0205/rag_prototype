@@ -29,7 +29,6 @@ export function DataPage({ userId }: { userId: string }) {
   }
 
   const structured = data.tables.filter((t) => t.group !== 'Documents' && t.name !== 'client_merge')
-  const records = structured.reduce((s, t) => s + t.rows, 0)
   const errors = data.quality_checks.filter((c) => c.severity === 'error')
   const gaps = data.quality_checks.filter((c) => c.severity === 'warning' && !c.passed)
   const docs = data.documents
@@ -49,10 +48,9 @@ export function DataPage({ userId }: { userId: string }) {
         </p>
       </header>
 
-      <section aria-label="At a glance" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Structured tables" value={String(structured.length)} note={`${records} records`} />
+      <section aria-label="At a glance" className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Stat label="Structured tables" value={String(structured.length)} note="Joined on client_id" />
         <Stat label="Clients" value={String(data.tables.find((t) => t.name === 'clients')?.rows ?? 0)} note={`${data.merges.length} duplicate${data.merges.length === 1 ? '' : 's'} merged`} />
-        <Stat label="Documents" value={String(docs.total)} note={`${data.index?.chunks_indexed ?? 0} passages indexed`} />
         <Stat
           label="Quality checks"
           value={`${errors.filter((c) => c.passed).length} of ${errors.length}`}
@@ -85,7 +83,7 @@ export function DataPage({ userId }: { userId: string }) {
                       <header className="flex items-baseline justify-between gap-2">
                         <span className="font-mono text-[13.5px] font-semibold text-slate-900">{t.name}</span>
                         <span className="text-[12px] tabular-nums text-slate-500">
-                          {t.rows} {t.rows === 1 ? 'row' : 'rows'}
+                          {t.rows === null ? 'access per row' : `${t.rows} ${t.rows === 1 ? 'row' : 'rows'}`}
                         </span>
                       </header>
                       <p className="mt-0.5 text-[12.5px] leading-snug text-slate-600">{t.description}</p>

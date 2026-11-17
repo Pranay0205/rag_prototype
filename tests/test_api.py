@@ -108,11 +108,21 @@ def test_API_6_RT_7_source_entitlement(client):
             f"/api/sources/{source_id.replace('#', '%23')}", params={"user_id": user}
         ).status_code
 
-    assert status("doc:he_note_005#0", "alex") == 403  # restricted
+    # hidden documents answer exactly like missing ones, so probing IDs reveals nothing
+    def body(source_id, user):
+        return client.get(f"/api/sources/{source_id.replace('#', '%23')}", params={"user_id": user}).json()
+
     assert status("doc:he_note_005#0", "kim") == 200
-    assert status("doc:he_email_004#0", "sam") == 403  # confidential
-    assert status("doc:nw_email_001#0", "kim") == 403  # outside coverage
-    assert status("doc:news_ca_001#0", "alex") == 403  # quarantined news
+    for doc, user in [
+        ("he_note_005", "alex"),  # restricted
+        ("he_email_004", "sam"),  # confidential
+        ("nw_email_001", "kim"),  # outside coverage
+        ("news_ca_001", "alex"),  # quarantined news
+    ]:
+        assert status(f"doc:{doc}#0", user) == 404
+        assert (
+            body(f"doc:{doc}#0", user)["detail"]["code"] == body("doc:no_such_doc#0", user)["detail"]["code"]
+        )
     body = client.get("/api/sources/doc:nw_email_007%230", params={"user_id": "alex"}).json()
     assert body["suspected_injection"] is True
 
@@ -281,6 +291,8 @@ def test_API_19_data_overview(client):
     revenue_cols = {c["name"]: c for c in tables["revenue"]["columns"]}
     assert revenue_cols["client_id"]["references"] == "clients"
     assert revenue_cols["source_client_id"]["role"] == "lineage"
+    assert tables["opportunities"]["rows"] is None  # a count would reveal the hidden Aurora deal
+    assert tables["revenue"]["rows"] == 65
     assert d["merges"][0]["merged_id"] == "C-007" and d["merges"][0]["survivor_id"] == "C-002"
     assert d["quality_checks"] and all(c["sql"] for c in d["quality_checks"])
     assert client.get("/api/data/overview", params={"user_id": "nobody"}).status_code == 404
