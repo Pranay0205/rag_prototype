@@ -2,7 +2,7 @@
 // sentence the claim relies on highlighted; both keep "AI input", the exact text the model was given.
 import { useEffect, useState, type ReactNode } from 'react'
 import { ApiError, api, type SourceDoc } from '../api'
-import type { Citation } from '../types'
+import type { Calculation, Citation } from '../types'
 import { SourceKindIcon } from './SectionCard'
 import { Spinner, cn, readable } from './ui'
 
@@ -12,7 +12,7 @@ interface Props {
   onClose: () => void
 }
 
-type Tab = 'main' | 'ai'
+type Tab = 'main' | 'calc' | 'ai'
 
 export function SourceDrawer({ citation, userId, onClose }: Props) {
   const [doc, setDoc] = useState<SourceDoc | null>(null)
@@ -20,6 +20,9 @@ export function SourceDrawer({ citation, userId, onClose }: Props) {
   const [tab, setTab] = useState<Tab>('main')
   const isDoc = citation.kind === 'document'
   const isRecord = !isDoc && Object.keys(citation.record ?? {}).length > 0
+  const calc = citation.calculation ?? null
+  // a computed summary opens on its calculation; a row with a computed field opens on the row
+  const tabs: Tab[] = calc ? (isRecord ? ['main', 'calc', 'ai'] : ['calc', 'main', 'ai']) : ['main', 'ai']
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -28,7 +31,7 @@ export function SourceDrawer({ citation, userId, onClose }: Props) {
   }, [onClose])
 
   useEffect(() => {
-    setTab('main')
+    setTab(calc && !isRecord ? 'calc' : 'main')
     if (!isDoc) return
     let cancelled = false
     api
@@ -38,6 +41,7 @@ export function SourceDrawer({ citation, userId, onClose }: Props) {
     return () => {
       cancelled = true
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [citation.source_id, userId, isDoc])
 
   const mainLabel = isDoc ? 'Document' : isRecord ? 'Record' : 'Summary'
@@ -82,7 +86,7 @@ export function SourceDrawer({ citation, userId, onClose }: Props) {
               : recordLocation(citation.source_id)}
           </p>
           <nav className="mt-4 flex gap-5 text-[13px] font-medium" aria-label="Views">
-            {(['main', 'ai'] as const).map((t) => (
+            {tabs.map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
@@ -92,14 +96,16 @@ export function SourceDrawer({ citation, userId, onClose }: Props) {
                   tab === t ? 'border-indigo-600 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-800',
                 )}
               >
-                {t === 'main' ? mainLabel : 'AI input'}
+                {t === 'main' ? mainLabel : t === 'calc' ? 'Calculation' : 'AI input'}
               </button>
             ))}
           </nav>
         </header>
 
         <div className="flex-1 overflow-y-auto bg-slate-50/40 px-6 py-5">
-          {tab === 'ai' ? (
+          {tab === 'calc' && calc ? (
+            <CalculationView calc={calc} />
+          ) : tab === 'ai' ? (
             <AiInput text={isDoc ? (doc?.cited_text ?? citation.snippet) : citation.snippet} cited={citation.quote ?? null} isDoc={isDoc} />
           ) : !isDoc ? (
             isRecord ? <RecordView citation={citation} /> : <SummaryView citation={citation} />
@@ -243,6 +249,87 @@ function SummaryView({ citation }: { citation: Citation }) {
         })}
       </ul>
     </div>
+  )
+}
+
+// ------------------------------------------------------------------ calculation (TOOL-16)
+
+const INPUT_LABELS: Record<string, string> = { source_client_id: 'Booked under', revenue_usd: 'Revenue' }
+
+/** How a computed figure was produced: the rule, each step of arithmetic, the query that ran and the
+ * rows it returned, so anyone can check the number by hand. */
+function CalculationView({ calc }: { calc: Calculation }) {
+  const cols = Object.keys(calc.inputs[0] ?? {})
+  return (
+    <div className="space-y-5">
+      <p className="rounded-xl bg-indigo-50/70 px-4 py-3 text-[13.5px] leading-relaxed text-indigo-950 ring-1 ring-inset ring-indigo-100">
+        <span className="font-semibold">Rule.</span> {calc.rule}
+      </p>
+
+      <CalcBlock title="Steps">
+        <ol className="divide-y divide-slate-100 rounded-xl bg-white ring-1 ring-slate-200/80">
+          {calc.steps.map((s, i) => (
+            <li key={s} className="flex gap-3 px-4 py-2.5 text-[13.5px] leading-snug">
+              <span className="mt-px grid h-5 w-5 shrink-0 place-items-center rounded-full bg-slate-100 text-[11px] font-semibold text-slate-600">
+                {i + 1}
+              </span>
+              <span className="tabular-nums text-slate-900">{s}</span>
+            </li>
+          ))}
+        </ol>
+      </CalcBlock>
+
+      <CalcBlock title="Query">
+        <div className="overflow-hidden rounded-xl bg-slate-950 ring-1 ring-slate-900/10">
+          <div className="flex items-center justify-between border-b border-white/10 px-4 py-2">
+            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">SQL, as it ran</span>
+            <CopyButton text={calc.query} label="Copy query" dark />
+          </div>
+          <pre className="whitespace-pre-wrap break-words px-4 py-3.5 font-mono text-[12.5px] leading-relaxed text-slate-200">{calc.query}</pre>
+        </div>
+      </CalcBlock>
+
+      <CalcBlock title={`Rows used (${calc.inputs.length})`}>
+        <div className="max-h-80 overflow-auto rounded-xl bg-white ring-1 ring-slate-200/80">
+          <table className="w-full text-[13px]">
+            <thead className="sticky top-0 bg-slate-50 text-left text-[12px] text-slate-500">
+              <tr>
+                {cols.map((c) => (
+                  <th key={c} className="px-3 py-2 font-medium">
+                    {INPUT_LABELS[c] ?? titleCase(c)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {calc.inputs.map((r, i) => (
+                <tr key={i} className="border-t border-slate-100">
+                  {cols.map((c) => (
+                    <td key={c} className="px-3 py-1.5 tabular-nums text-slate-800">
+                      {formatField(c, r[c]) ?? ''}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CalcBlock>
+
+      <p className="text-[12.5px] leading-relaxed text-slate-500">
+        Computed by code from the database, never by the model. The model was given only the resulting values (see AI
+        input).
+      </p>
+    </div>
+  )
+}
+
+function CalcBlock({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section>
+      <h4 className="mb-2 text-[12px] font-semibold uppercase tracking-wider text-slate-500">{title}</h4>
+      {children}
+    </section>
   )
 }
 

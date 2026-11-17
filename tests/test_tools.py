@@ -130,6 +130,24 @@ def test_TOOL_6_northwind_ttm(tools, alex):
     assert "$3,400,000" in r.sources[0].snippet  # computed figure is traceable (TOOL-3)
 
 
+def test_TOOL_16_revenue_calculation_adds_up(tools, alex):
+    calc = tools.get_revenue(alex, "C-001").sources[0].calculation
+    assert calc and "client_id='C-001'" in calc.query and len(calc.inputs) == 24
+    assert sum(r["revenue_usd"] for r in calc.inputs if r["period"] >= "2025Q4") == 3_400_000
+    assert "= $3,400,000" in calc.steps[1] and "= -18.1%" in calc.steps[3]
+    missing = tools.get_revenue(alex, "C-003").sources[0].calculation
+    assert "never estimated" in missing.steps[1]  # a gap is stated, not filled
+
+
+def test_TOOL_16_overdue_and_maturity_calculations(tools, alex):
+    cites = {s.source_id: s for s in tools.get_pipeline(alex, "C-001").sources}
+    assert cites["sql:open_actions/A-101"].calculation.steps == [
+        "Due 15 Oct 2026, today 16 Nov 2026: 32 days overdue"
+    ]
+    h = {s.source_id: s for s in tools.get_holdings(alex, "C-001").sources}
+    assert "within 12 months" in h["sql:holdings/H-101"].calculation.steps[0]
+
+
 def test_TOOL_6_helios_merged_ttm(tools, alex):
     assert tools.get_revenue(alex, "C-002").data["total"]["current_ttm"] == 3_500_000
 

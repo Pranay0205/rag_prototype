@@ -40,6 +40,16 @@ as `UNAVAILABLE` with the exception logged.
 **TOOL-3 Every datum is sourced.** Any value in `data` must be traceable to an entry in
 `sources`. Computed values (TTM, YoY) list all rows they were computed from.
 
+**TOOL-16 Calculation trace.** A computed figure's citation carries a `calculation` with:
+- the rule in plain language;
+- the query exactly as the tool ran it, parameters filled in for reading;
+- the rows it used;
+- each arithmetic step.
+
+This covers revenue TTM and YoY, days overdue on actions, and holdings that mature within 12
+months. It is shown in the source drawer's Calculation tab and never sent to the model. The
+arithmetic is done by code, never by the model.
+
 ## Tools
 
 | ID | Signature | Returns | Notes |

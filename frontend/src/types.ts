@@ -14,6 +14,14 @@ export type SourceKind = 'sql' | 'document'
 export type Confidence = 'high' | 'medium' | 'low'
 export type ClaimStatus = 'verified' | 'unverified' | 'conflict'
 
+/** TOOL-16: how a computed figure was produced. Shown in the drawer, never sent to the model. */
+export interface Calculation {
+  rule: string
+  query: string
+  inputs: Record<string, unknown>[]
+  steps: string[]
+}
+
 export interface Citation {
   source_id: string
   kind: SourceKind
@@ -22,6 +30,7 @@ export interface Citation {
   snippet: string
   quote?: string | null // exact supporting span, located in the source by the backend
   record?: Record<string, unknown> | null // structured sources: the database row behind the snippet
+  calculation?: Calculation | null // computed figures: query, input rows and arithmetic
 }
 
 export interface Claim {

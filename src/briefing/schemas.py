@@ -43,6 +43,17 @@ class ClaimStatus(StrEnum):
     CONFLICT = "conflict"  # sources disagree; see Briefing.conflicts
 
 
+class Calculation(BaseModel):
+    """TOOL-16: how a computed figure was produced, so it can be checked by hand: the query exactly
+    as the tool ran it (parameters filled in), the rows of its result the figure uses, and each
+    arithmetic step. Shown in the source drawer; never sent to the model."""
+
+    rule: str  # the business rule in plain language
+    query: str
+    inputs: list[dict[str, Any]]
+    steps: list[str]
+
+
 class Citation(BaseModel):
     source_id: str  # e.g. "sql:metrics/C-001/2026Q3" or "doc:email_0142#2"
     kind: SourceKind
@@ -55,6 +66,8 @@ class Citation(BaseModel):
     # Structured sources only: the database row behind `snippet`, shown as a record in the UI so a
     # system-of-record value is never mistaken for a document sentence. Never sent to the model.
     record: dict[str, Any] | None = None
+    # Computed figures only (TOOL-16): the query, input rows and arithmetic behind the value.
+    calculation: Calculation | None = None
 
 
 class Claim(BaseModel):

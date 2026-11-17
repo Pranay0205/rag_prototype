@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from briefing import config
 from briefing.db import jlist, rows
 from briefing.entities import EntityResolver
-from briefing.schemas import Citation, SourceKind, Viewer
+from briefing.schemas import Calculation, Citation, SourceKind, Viewer
 
 log = logging.getLogger(__name__)
 
@@ -46,7 +46,12 @@ def _fail(code: ErrorCode, message: str, candidates: list[str] | None = None) ->
 
 
 def _sql_source(
-    source_id: str, title: str, snippet: str, on: str | None = None, record: dict | None = None
+    source_id: str,
+    title: str,
+    snippet: str,
+    on: str | None = None,
+    record: dict | None = None,
+    calculation: Calculation | None = None,
 ) -> Citation:
     return Citation(
         source_id=f"sql:{source_id}",
@@ -55,11 +60,74 @@ def _sql_source(
         date=date.fromisoformat(on) if on else None,
         snippet=snippet,
         record=record,
+        calculation=calculation,
     )
+
+
+def _shown_sql(sql: str, params: tuple) -> str:
+    """TOOL-16: the query as it ran, with its parameters filled in for reading (display only; the
+    query itself always runs parameterized)."""
+    out = sql
+    for p in params:
+        out = out.replace("?", repr(p) if isinstance(p, str) else str(p), 1)
+    return " ".join(out.split())
+
+
+def _day(iso: str) -> str:
+    """2026-10-15 -> 15 Oct 2026"""
+    d = date.fromisoformat(iso)
+    return f"{d.day} {d:%b %Y}"
+
+
+def _quarter(period: str) -> str:
+    """2026Q3 -> Q3 2026"""
+    return f"Q{period[-1]} {period[:4]}"
 
 
 def _usd(v: float | int | None) -> str:
     return "n/a" if v is None else f"${v:,.0f}"
+
+
+def _revenue_calculation(
+    sql: str, params: tuple, recs: list[dict], data: dict, current: list[str], prior: list[str]
+) -> Calculation:
+    """TOOL-16: the arithmetic behind relationship revenue TTM and YoY, step by step."""
+    by_q = {q["period"]: q["total"] for q in data["quarterly"]}
+
+    def window(label: str, quarters: list[str], total: float | None) -> str:
+        parts = " + ".join(f"{_quarter(q)} {_usd(by_q[q])}" for q in quarters)
+        head = f"{label} ({_quarter(quarters[0])} to {_quarter(quarters[-1])})"
+        if total is None:
+            gap = ", ".join(_quarter(q) for q in quarters if by_q[q] is None)
+            return f"{head}: {gap} has no rows, so no total is given (never estimated)"
+        return f"{head}: {parts} = {_usd(total)}"
+
+    total = data["total"]
+    steps = [
+        f"Each quarter's total is the sum of its product-line rows ({len(recs)} rows in all)",
+        window("Last 12 months", current, total["current_ttm"]),
+        window("Prior 12 months", prior, total["prior_ttm"]),
+    ]
+    if total["yoy_pct"] is not None:
+        steps.append(
+            f"Change: ({_usd(total['current_ttm'])} - {_usd(total['prior_ttm'])}) "
+            f"/ {_usd(total['prior_ttm'])} = {total['yoy_pct']:+.1f}%"
+        )
+    steps += [
+        f"{b['product_line']}: {_usd(b['current_ttm'])} vs {_usd(b['prior_ttm'])}"
+        + (f" = {b['yoy_pct']:+.1f}%" if b["yoy_pct"] is not None else "")
+        for b in data["by_product_line"]
+    ]
+    return Calculation(
+        rule="Relationship revenue for the last 12 months is the sum of the last four reported quarters "
+        "across all product lines. The change compares it with the four quarters before. "
+        "If a quarter is missing, no total is given rather than an estimate.",
+        query=_shown_sql(sql, params),
+        inputs=[
+            {k: r[k] for k in ("period", "product_line", "revenue_usd", "source_client_id")} for r in recs
+        ],
+        steps=steps,
+    )
 
 
 def _mentions(text: str, name: str) -> bool:
@@ -361,13 +429,13 @@ class Tools:
         cid = self._cid(client_id)
         current = _last_quarters(config.TODAY, 4)
         prior = _last_quarters(config.TODAY, 8)[:4]
-        recs = rows(
-            self.conn,
+        sql = (
             "SELECT * FROM revenue WHERE client_id=? AND period IN ({}) ORDER BY period, product_line".format(
                 ",".join("?" * 8)
-            ),
-            (cid, *prior, *current),
+            )
         )
+        params = (cid, *prior, *current)
+        recs = rows(self.conn, sql, params)
         present = {r["period"] for r in recs}
         missing = [q for q in prior + current if q not in present]
         warnings = [f"Revenue for {q} not available" for q in missing]
@@ -418,7 +486,14 @@ class Tools:
             + (f". Missing: {', '.join(missing)}" if missing else "")
             + f". Computed from {len(recs)} revenue rows."
         )
-        sources = [_sql_source(f"revenue/{cid}/summary", "Relationship revenue summary", summary)]
+        sources = [
+            _sql_source(
+                f"revenue/{cid}/summary",
+                "Relationship revenue summary",
+                summary,
+                calculation=_revenue_calculation(sql, params, recs, data, current, prior),
+            )
+        ]
         sources += [
             _sql_source(
                 f"revenue/{cid}/{r['period']}/{r['product_line']}",
@@ -438,9 +513,23 @@ class Tools:
         """TOOL-7: products held, with maturity-within-12-months flag."""
         cid = self._cid(client_id)
         horizon = (config.TODAY + timedelta(days=365)).isoformat()
-        hs = rows(self.conn, "SELECT * FROM holdings WHERE client_id=? ORDER BY holding_id", (cid,))
+        holdings_sql = "SELECT * FROM holdings WHERE client_id=? ORDER BY holding_id"
+        hs = rows(self.conn, holdings_sql, (cid,))
         for h in hs:
             h["matures_within_12m"] = bool(h["maturity_date"] and h["maturity_date"] <= horizon)
+
+        def maturity_calc(h: dict) -> Calculation | None:
+            if not h["maturity_date"]:
+                return None
+            within = "within 12 months" if h["matures_within_12m"] else "not within 12 months"
+            return Calculation(
+                rule=f"A facility matures within 12 months when its maturity date is on or before "
+                f"{_day(horizon)} (today, {_day(config.TODAY.isoformat())}, plus 365 days).",
+                query=_shown_sql(holdings_sql, (cid,)),
+                inputs=[{k: h[k] for k in ("holding_id", "product", "maturity_date")}],
+                steps=[f"Matures {_day(h['maturity_date'])}, compared with {_day(horizon)}: {within}"],
+            )
+
         sources = [
             _sql_source(
                 f"holdings/{h['holding_id']}",
@@ -452,6 +541,7 @@ class Tools:
                 + (f". {h['notes']}" if h["notes"] else ""),
                 h["opened_date"],
                 record=h,
+                calculation=maturity_calc(h),
             )
             for h in hs
         ]
@@ -490,10 +580,28 @@ class Tools:
             self.conn, "SELECT * FROM service_issues WHERE client_id=? ORDER BY opened_date", (cid,)
         )
         issues = [i for i in issues_all if can_see(viewer, i["classification"], jlist(i["access_groups"]))]
-        actions = rows(self.conn, "SELECT * FROM open_actions WHERE client_id=? ORDER BY due_date", (cid,))
+        actions_sql = "SELECT * FROM open_actions WHERE client_id=? ORDER BY due_date"
+        actions = rows(self.conn, actions_sql, (cid,))
         for a in actions:
             a["overdue"] = a["status"] == "open" and a["due_date"] < today
             a["days_overdue"] = (config.TODAY - date.fromisoformat(a["due_date"])).days if a["overdue"] else 0
+
+        def overdue_calc(a: dict) -> Calculation | None:
+            if a["status"] != "open":
+                return None
+            due, now = _day(a["due_date"]), _day(today)
+            step = (
+                f"Due {due}, today {now}: {a['days_overdue']} days overdue"
+                if a["overdue"]
+                else f"Due {due} is not before today ({now}): not overdue"
+            )
+            return Calculation(
+                rule="An open action is overdue when its due date is before today. "
+                "Days overdue = today minus the due date.",
+                query=_shown_sql(actions_sql, (cid,)),
+                inputs=[{k: a[k] for k in ("action_id", "status", "due_date")}],
+                steps=[step],
+            )
 
         sources = [
             _sql_source(
@@ -527,6 +635,7 @@ class Tools:
                 + ")",
                 a["due_date"],
                 record=a,
+                calculation=overdue_calc(a),
             )
             for a in actions
         ]
