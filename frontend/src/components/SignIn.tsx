@@ -37,9 +37,9 @@ export function SignIn({ users, onSignIn }: Props) {
       {/* brand panel */}
       <section
         aria-label="About Briefing Desk"
-        className="relative flex min-h-[320px] flex-[1_1_440px] flex-col gap-12 overflow-hidden bg-[#0B1530] p-[clamp(32px,5vw,64px)] text-white"
+        className="relative flex min-h-[320px] flex-[1_1_440px] flex-col gap-12 overflow-hidden bg-slate-900 p-[clamp(32px,5vw,64px)] text-white"
       >
-        <div className="pointer-events-none absolute -left-32 -top-32 h-[460px] w-[460px] rounded-full bg-indigo-600/30 blur-[120px]" />
+        <div className="pointer-events-none absolute -left-32 -top-32 h-[460px] w-[460px] rounded-full bg-indigo-500/20 blur-[120px]" />
         <div className="pointer-events-none absolute -bottom-40 right-[-80px] h-[420px] w-[420px] rounded-full bg-violet-600/20 blur-[120px]" />
         <div
           className="pointer-events-none absolute inset-0 opacity-[0.07]"
@@ -60,11 +60,11 @@ export function SignIn({ users, onSignIn }: Props) {
           <h2 className="rise text-[clamp(28px,3vw,40px)] font-semibold leading-[1.15] tracking-tight">
             Walk into every client meeting with a briefing you can trust.
           </h2>
-          <ul className="space-y-[18px] text-[15px] leading-normal text-[#C9D2E3]">
+          <ul className="space-y-[18px] text-[15px] leading-normal text-slate-300">
             {PROMISES.map((p, i) => (
               <li key={p.text} className="rise flex gap-3" style={{ animationDelay: `${120 + i * 90}ms` }}>
                 <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white/[0.06] ring-1 ring-white/10">
-                  <svg viewBox="0 0 24 24" className="h-4 w-4 text-[#8FA8E8]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" className="h-4 w-4 text-indigo-300" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     {p.icon}
                   </svg>
                 </span>
@@ -74,7 +74,7 @@ export function SignIn({ users, onSignIn }: Props) {
           </ul>
         </div>
 
-        <p className="relative text-[13px] text-[#9AA7BF]">Internal use only · Meridian employees and authorized contractors</p>
+        <p className="relative text-[13px] text-slate-400">Internal use only · Meridian employees and authorized contractors</p>
       </section>
 
       {/* sign-in */}
