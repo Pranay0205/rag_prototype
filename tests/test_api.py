@@ -285,6 +285,7 @@ def test_API_18_client_overview_respects_access(client):
     assert all(r["citation"] for r in alex["holdings"] + alex["contacts"])  # every row opens its source
     alex_docs = {d["doc_id"] for d in alex["documents"]}
     assert "he_note_005" not in alex_docs and alex["access_limited"]  # Aurora note: deal team only
+    assert alex["loaded_at"]  # "Data as of" on the page
     assert "he_note_005" in {d["doc_id"] for d in kim["documents"]}
     assert any("Aurora" in o["product"] for o in kim["opportunities"])
     assert all("Aurora" not in o["product"] for o in alex["opportunities"])

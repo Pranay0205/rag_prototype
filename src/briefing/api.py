@@ -608,7 +608,8 @@ def client_overview(client_id: str, user_id: str):
     """API-18: the client as a whole (not one meeting): profile, coverage, contacts, revenue,
     holdings, financials, pipeline, service issues, actions, interactions, meetings and documents.
     Composed from the typed tools, so coverage and entitlements apply; no model involved. Each row
-    carries the citation that opens it in the source drawer."""
+    carries the citation that opens it in the source drawer. `loaded_at` is when the data was last
+    ingested, shown on the page as "Data as of" (UI-14)."""
     t = tools()
     viewer = viewer_or_404(t, user_id)
     profile = t.get_client_profile(viewer, client_id)
@@ -653,6 +654,7 @@ def client_overview(client_id: str, user_id: str):
             {**d, "citation": cites.get(f"doc:{d['doc_id']}#0")} for d in results["documents"].data or []
         ],
         "access_limited": any(r.access_limited for r in [profile, *results.values()]),
+        "loaded_at": data_built_at(),
     }
 
 

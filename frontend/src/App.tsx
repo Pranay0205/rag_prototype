@@ -74,6 +74,7 @@ export default function App() {
   })
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [meeting, setMeeting] = useState<Meeting | null>(null)
+  const [clients, setClients] = useState<{ client_id: string; name: string }[]>([])
   const [clientPage, setClientPage] = useState<string | null>(null) // UI-14: open client page
   const [run, setRun] = useState<Run>(IDLE)
   const [view, setView] = useState<View>('briefing')
@@ -110,7 +111,10 @@ export default function App() {
     } catch {
       // storage unavailable (private mode): sign-in simply is not remembered
     }
-    if (userId) api.meetings(userId).then(setMeetings)
+    if (!userId) return
+    api.meetings(userId).then(setMeetings)
+    // the chat can ask about any covered client, not only those with a meeting coming up
+    api.home(userId).then((h) => setClients(h.companies.map((c) => ({ client_id: c.client_id, name: c.name }))))
   }, [userId])
 
   const openSaved = useCallback(
@@ -446,7 +450,7 @@ export default function App() {
 
       <ChatWidget
         userId={userId}
-        clients={[...new Map(meetings.map((m) => [m.client_id, { client_id: m.client_id, name: m.legal_name }])).values()]}
+        clients={clients}
         currentClientId={chatClient ?? meeting?.client_id ?? clientPage}
         open={chatOpen}
         onOpenChange={setChatOpen}

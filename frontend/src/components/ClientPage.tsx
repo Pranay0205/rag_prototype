@@ -102,11 +102,14 @@ export function ClientPage({ clientId, userId, onCite, onOpenMeeting, onAsk }: P
         </div>
       </header>
 
-      {data.access_limited && (
-        <p className="flex items-center gap-2 text-[13px] text-slate-600">
-          <LockIcon /> Some records for this client are restricted for your profile.
-        </p>
-      )}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[13px] text-slate-600">
+        <DataAsOf data={data} />
+        {data.access_limited && (
+          <p className="flex items-center gap-2">
+            <LockIcon /> Some records for this client are restricted for your profile.
+          </p>
+        )}
+      </div>
 
       {/* headline numbers */}
       <section aria-label="Relationship at a glance" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -365,6 +368,43 @@ export function ClientPage({ clientId, userId, onCite, onOpenMeeting, onAsk }: P
         </div>
       </div>
     </div>
+  )
+}
+
+/** How fresh each source is: when the data was loaded, and the newest record from each source. */
+function DataAsOf({ data }: { data: ClientOverview }) {
+  const newest = (types: string[]) =>
+    data.documents
+      .filter((d) => types.includes(d.doc_type))
+      .map((d) => d.date)
+      .sort()
+      .at(-1)
+  const sources: [string, string | undefined][] = [
+    ['Revenue', data.revenue.as_of_quarter && readable(data.revenue.as_of_quarter)],
+    ['CRM activity', data.interactions[0]?.date && readable(data.interactions[0].date)],
+    ['Email', newest(['email']) && readable(newest(['email'])!)],
+    ['Notes', newest(['call_note', 'meeting_note']) && readable(newest(['call_note', 'meeting_note'])!)],
+    ['News', newest(['news']) && readable(newest(['news'])!)],
+    ['Financials', data.financials.at(-1)?.fiscal_period],
+  ]
+  return (
+    <p className="flex flex-wrap items-center gap-x-5 gap-y-1">
+      <span className="inline-flex items-center gap-1.5 font-medium text-slate-700">
+        <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <circle cx="10" cy="10" r="7.5" />
+          <path d="M10 6v4l2.5 2" strokeLinecap="round" />
+        </svg>
+        Data as of
+        {data.loaded_at && ` ${readable(data.loaded_at.slice(0, 10))}, ${data.loaded_at.slice(11, 16)}`}
+      </span>
+      {sources
+        .filter(([, v]) => v)
+        .map(([label, v]) => (
+          <span key={label} title={`Newest ${label.toLowerCase()} record`}>
+            <span className="text-slate-500">{label}</span> <span className="font-medium text-slate-800">{v}</span>
+          </span>
+        ))}
+    </p>
   )
 }
 

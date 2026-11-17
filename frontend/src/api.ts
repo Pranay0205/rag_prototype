@@ -179,6 +179,7 @@ export interface ClientOverview {
     changed_recently: boolean
   })[]
   revenue: Cited & {
+    as_of_quarter?: string
     current_period?: string
     total?: { current_ttm: number | null; prior_ttm: number | null; yoy_pct: number | null }
     by_product_line?: { product_line: string; current_ttm: number | null; prior_ttm: number | null; yoy_pct: number | null }[]
@@ -244,6 +245,7 @@ export interface ClientOverview {
     link_method: string
   })[]
   access_limited: boolean
+  loaded_at: string | null // when the data was last ingested
 }
 
 export interface HistoryItem {

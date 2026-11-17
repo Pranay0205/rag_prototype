@@ -34,7 +34,7 @@ Status: DRAFT for review
 | API-15 | `GET /home?user_id` | Dashboard: upcoming meetings (with whether a briefing is prepared), covered companies with revenue TTM and YoY, facilities sorted by maturity |
 | API-16 | `GET /actions?user_id&client_id` | The viewer's own actions for a client (ticked suggestions, typed-in items, commitments from notes) with `origin`, so they carry into later briefings |
 | API-17 | `DELETE /actions/{id}?user_id` | Untick or remove an action; creator only |
-| API-18 | `GET /clients/{id}/overview?user_id` | The client as a whole: profile, aliases, coverage, contacts, revenue, holdings, financials, pipeline, service issues, actions, interactions, meetings, documents (TOOL-15). Composed from the typed tools, so coverage and entitlements apply; no model. Every row carries its citation; `access_limited` when anything was withheld |
+| API-18 | `GET /clients/{id}/overview?user_id` | The client as a whole: profile, aliases, coverage, contacts, revenue, holdings, financials, pipeline, service issues, actions, interactions, meetings, documents (TOOL-15). Composed from the typed tools, so coverage and entitlements apply; no model. Every row carries its citation; `access_limited` when anything was withheld; `loaded_at` = last ingestion |
 | API-12 | `GET /briefings/history?user_id&client_id` | The viewer's own saved versions for a client, newest first: `briefing_id`, `created_at`, `stale`, claim / verified / conflict counts. Opening one goes through API-11 with `briefing_id`, so the same access checks apply |
 
 Errors: tool error codes map to HTTP (`FORBIDDEN`/`NOT_IN_COVERAGE` → 403, `NOT_FOUND` → 404,
@@ -98,10 +98,13 @@ as a whole, not the meeting briefing (API-18): headline numbers (revenue TTM and
 open pipeline, open actions), quarterly revenue and product lines, products and facilities, pipeline,
 interaction history, upcoming meetings (each opens its briefing), people and coverage, open actions and
 service issues, the client's reported financials, and the documents the viewer may see. Every row
-opens its source in the drawer. Straight from the database, so it loads instantly.
+opens its source in the drawer. Straight from the database, so it loads instantly. A "Data as of" line
+shows when the data was loaded and the newest record per source (revenue quarter, CRM activity, email,
+notes, news, financials), so a stale feed is visible.
 
 **UI-13 Ask chat:** a hovering ask bar at the bottom centre of every page, plus "Ask about <client>" in the
-briefing header and "Ask about this client" on Home; the panel opens in place and can switch client. Typing is never blocked. While
+briefing header and "Ask about this client" on Home; the panel opens in place and can switch client
+through a searchable picker over every covered client (name or alias via API-13), not only those with a meeting. Typing is never blocked. While
 the user types, the client named in the question is detected (API-13, aliases included) and shown
 ("About Northwind Logistics, from NWL"); otherwise the client on screen is used; with neither, the
 chat keeps the question and asks which client it is about. Suggested questions; each answer shows
