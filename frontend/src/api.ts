@@ -1,5 +1,5 @@
 // Typed client for the FastAPI backend (specs/05-api-ui.md). Vite proxies /api to :8000.
-import type { Briefing, Section } from './types'
+import type { Briefing, Conflict, Exhibits, KeyFigure, Section, Unknown } from './types'
 
 export interface User {
   user_id: string
@@ -89,7 +89,50 @@ export interface SavedBriefing {
   created_at: string
   stale: boolean // source data was refreshed after this briefing was prepared
   reviews: Record<string, 'accept' | 'reject'>
+  review_notes: Record<string, string> // reject reasons
   created_suggestions: string[]
+}
+
+/** API-15: the signed-in dashboard. */
+export interface HomeData {
+  today: string
+  meetings: (Meeting & { last_prepared: string | null })[]
+  companies: {
+    client_id: string
+    name: string
+    industry: string
+    aliases: string[]
+    role: string | null
+    revenue_ttm: number | null
+    yoy_pct: number | null
+    next_meeting_id: string | null
+    last_prepared: string | null
+  }[]
+  facilities: {
+    client_id: string
+    client: string
+    product: string
+    notional_usd: number
+    maturity_date: string | null
+    matures_within_12m: boolean
+    notes: string | null
+  }[]
+}
+
+/** API-13 */
+export interface ClientSearch {
+  results: { client_id: string; name: string; matched_alias: string | null }[]
+  notice: string | null
+}
+
+/** API-14 (ORC-15) */
+export interface AskAnswer {
+  ask_id: string
+  question: string
+  section: Section
+  conflicts: Conflict[]
+  unknowns: Unknown[]
+  access_limited: boolean
 }
 
 export interface HistoryItem {
@@ -102,6 +145,8 @@ export interface HistoryItem {
 }
 
 export interface StreamHandlers {
+  onFigures: (figures: KeyFigure[]) => void
+  onExhibits: (exhibits: Exhibits) => void
   onSection: (section: Section) => void
   onBriefing: (briefing: Briefing) => void
   onError: (message: string) => void
@@ -118,6 +163,8 @@ export const api = {
   /** Opens the SSE stream. Returns a function that closes it. */
   streamBriefing(briefingId: string, handlers: StreamHandlers): () => void {
     const source = new EventSource(`/api/briefings/${briefingId}/stream`)
+    source.addEventListener('figures', (e) => handlers.onFigures(JSON.parse(e.data)))
+    source.addEventListener('exhibits', (e) => handlers.onExhibits(JSON.parse(e.data)))
     source.addEventListener('section', (e) => handlers.onSection(JSON.parse(e.data)))
     source.addEventListener('briefing', (e) => {
       handlers.onBriefing(JSON.parse(e.data))
@@ -135,8 +182,8 @@ export const api = {
   source: (sourceId: string, userId: string) =>
     request<SourceDoc>(`/api/sources/${encodeURIComponent(sourceId)}?user_id=${userId}`),
 
-  review: (briefingId: string, claimId: string, userId: string, decision: 'accept' | 'reject') =>
-    post(`/api/briefings/${briefingId}/claims/${claimId}/review`, { user_id: userId, decision }),
+  review: (briefingId: string, claimId: string, userId: string, decision: 'accept' | 'reject' | 'clear', note = '') =>
+    post(`/api/briefings/${briefingId}/claims/${claimId}/review`, { user_id: userId, decision, note }),
 
   createAction: (action: {
     user_id: string
@@ -168,4 +215,12 @@ export const api = {
     request<HistoryItem[]>(`/api/briefings/history?user_id=${userId}&client_id=${clientId}`),
 
   dataHealth: () => request<DataHealth>('/api/health/data'),
+
+  home: (userId: string) => request<HomeData>(`/api/home?user_id=${userId}`),
+
+  searchClients: (userId: string, q: string) =>
+    request<ClientSearch>(`/api/clients/search?user_id=${userId}&q=${encodeURIComponent(q)}`),
+
+  ask: (clientId: string, userId: string, question: string) =>
+    post<AskAnswer>(`/api/clients/${clientId}/ask`, { user_id: userId, question }),
 }

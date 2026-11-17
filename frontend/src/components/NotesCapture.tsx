@@ -1,7 +1,7 @@
 // UI-8: close the loop. Post-meeting notes -> extracted commitments -> confirmed actions.
 import { useState } from 'react'
 import { ApiError, api, type Commitment } from '../api'
-import { Badge, PanelTitle, Spinner } from './ui'
+import { Badge, PanelTitle, Spinner, readable } from './ui'
 
 interface Props {
   clientId: string
@@ -83,7 +83,7 @@ export function NotesCapture({ clientId, userId }: Props) {
                   {c.quote}
                 </blockquote>
                 <div className="mt-3 flex items-center justify-between">
-                  <span className="text-xs text-slate-400">{c.due ? `Due ${c.due}` : 'No due date stated'}</span>
+                  <span className="text-xs text-slate-400">{c.due ? `Due ${readable(c.due)}` : 'No due date stated'}</span>
                   {created.has(i) ? (
                     <Badge tone="good">Action created</Badge>
                   ) : (

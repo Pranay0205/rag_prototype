@@ -1,6 +1,6 @@
 // Small shared presentational pieces.
 import { useId, type ReactNode } from 'react'
-import type { ClaimStatus, Confidence, SectionKey } from '../types'
+import type { Confidence, SectionKey } from '../types'
 
 export function cn(...classes: (string | false | null | undefined)[]): string {
   return classes.filter(Boolean).join(' ')
@@ -16,6 +16,20 @@ export const SECTION_ORDER: { key: SectionKey; title: string }[] = [
   { key: 'news_events', title: 'Recent news' },
   { key: 'uncertainty', title: 'Uncertain, conflicting or unavailable' },
 ]
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** Machine formats in display text made human: "2026-10-15" -> "15 Oct 2026", "2025Q4" -> "Q4 2025",
+ * "proposal_pending" -> "proposal pending". Display only: verification and the source drawer keep
+ * the original text. */
+export function readable(text: string): string {
+  return text
+    .replace(/\b(\d{4})-(\d{2})-(\d{2})(?:T\d{2}:\d{2}(?::\d{2})?)?\b/g, (_, y, m, d) =>
+      Number(m) >= 1 && Number(m) <= 12 ? `${Number(d)} ${MONTHS[Number(m) - 1]} ${y}` : `${y}-${m}-${d}`,
+    )
+    .replace(/\b(\d{4})Q([1-4])\b/g, 'Q$2 $1')
+    .replace(/\b([a-z]+(?:_[a-z]+)+)\b/g, (w) => w.replace(/_/g, ' '))
+}
 
 /** 12-hour time, minutes only when not on the hour: "10 AM", "3 PM", "10:30 AM". */
 export function formatTime(d: Date): string {
@@ -51,31 +65,6 @@ export function Badge({ tone = 'neutral', children }: { tone?: Tone; children: R
       )}
     >
       {children}
-    </span>
-  )
-}
-
-export function StatusIcon({ status }: { status: ClaimStatus }) {
-  if (status === 'verified') {
-    return (
-      <span title="Verified against cited sources" className="mt-0.5 shrink-0 text-emerald-600">
-        <svg viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor" aria-label="verified">
-          <path
-            fillRule="evenodd"
-            d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.86-9.86a.75.75 0 0 0-1.22-.88l-3.24 4.5-1.6-1.6a.75.75 0 1 0-1.06 1.06l2.22 2.22a.75.75 0 0 0 1.14-.09l3.76-5.21Z"
-          />
-        </svg>
-      </span>
-    )
-  }
-  return (
-    <span title="Could not be fully verified. Check the sources." className="mt-0.5 shrink-0 text-amber-500">
-      <svg viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor" aria-label="unverified">
-        <path
-          fillRule="evenodd"
-          d="M8.49 2.86c.67-1.15 2.35-1.15 3.02 0l6.28 10.88c.67 1.15-.17 2.6-1.51 2.6H3.72c-1.34 0-2.18-1.45-1.51-2.6L8.49 2.86ZM10 6a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 6Zm0 8a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"
-        />
-      </svg>
     </span>
   )
 }

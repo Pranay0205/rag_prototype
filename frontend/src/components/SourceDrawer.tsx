@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react'
 import { ApiError, api, type SourceDoc } from '../api'
 import type { Citation } from '../types'
-import { Badge, Spinner } from './ui'
+import { SourceKindIcon } from './SectionCard'
+import { Badge, Spinner, cn, readable } from './ui'
 
 interface Props {
   citation: Citation
@@ -43,11 +44,19 @@ export function SourceDrawer({ citation, userId, onClose }: Props) {
       >
         <header className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-              {isDoc ? 'Source document' : 'Structured data (system of record)'}
+            <div
+              className={cn(
+                'flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider',
+                isDoc ? 'text-slate-400' : 'text-indigo-600',
+              )}
+            >
+              <SourceKindIcon citation={citation} className="h-3.5 w-3.5 text-current" />
+              {isDoc ? 'Source document' : 'Database record'}
             </div>
             <h3 className="mt-1 font-semibold text-slate-900">{doc?.title ?? citation.title}</h3>
-            <div className="mt-0.5 font-mono text-[11px] text-slate-400">{citation.source_id}</div>
+            <div className="mt-0.5 text-[12px] text-slate-400" title={citation.source_id}>
+              {isDoc ? citation.source_id : recordLocation(citation.source_id)}
+            </div>
           </div>
           <button onClick={onClose} autoFocus className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100" aria-label="Close">
             <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
@@ -57,11 +66,7 @@ export function SourceDrawer({ citation, userId, onClose }: Props) {
         </header>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
-          {!isDoc && (
-            <div className="rounded-lg bg-slate-50 p-4">
-              <Highlighted body={citation.snippet} cited={citation.quote ?? null} />
-            </div>
-          )}
+          {!isDoc && <RecordView citation={citation} />}
 
           {isDoc && !doc && !error && (
             <div className="flex items-center gap-2 text-sm text-slate-500">
@@ -77,7 +82,7 @@ export function SourceDrawer({ citation, userId, onClose }: Props) {
                 <dt className="text-slate-400">Type</dt>
                 <dd className="text-slate-700">{doc.doc_type.replace('_', ' ')}</dd>
                 <dt className="text-slate-400">Date</dt>
-                <dd className="text-slate-700">{doc.date}</dd>
+                <dd className="text-slate-700">{readable(doc.date)}</dd>
                 {doc.author && (
                   <>
                     <dt className="text-slate-400">Author</dt>
@@ -100,6 +105,76 @@ export function SourceDrawer({ citation, userId, onClose }: Props) {
           )}
         </div>
       </aside>
+    </div>
+  )
+}
+
+/** "sql:contacts/K-102" -> "contacts table · record K-102" */
+function recordLocation(sourceId: string): string {
+  const [table, ...key] = sourceId.replace(/^sql:/, '').split('/')
+  return `${table.replace(/_/g, ' ')} table · record ${key.join(' / ')}`
+}
+
+const HIDDEN_FIELDS = new Set(['access_groups'])
+
+function formatField(key: string, value: unknown): string | null {
+  if (value === null || value === undefined || value === '' || value === '[]') return null
+  if (typeof value === 'boolean' || ((key.startsWith('is_') || key === 'overdue') && (value === 0 || value === 1)))
+    return value ? 'Yes' : 'No'
+  if (typeof value === 'number' && /usd/.test(key)) return `$${value.toLocaleString('en-US')}`
+  if (typeof value === 'string' && value.startsWith('[')) {
+    try {
+      return (JSON.parse(value) as unknown[]).join(', ')
+    } catch {
+      return value
+    }
+  }
+  return readable(String(value))
+}
+
+/** UI-4 structured source: the database row itself, then the sentence the model was given.
+ * Fields the cited sentence relies on are highlighted. Computed summaries have no single row. */
+function RecordView({ citation }: { citation: Citation }) {
+  const fields = Object.entries(citation.record ?? {})
+    .filter(([k]) => !HIDDEN_FIELDS.has(k))
+    .map(([k, v]) => [k, formatField(k, v), String(v)] as const)
+    .filter((f): f is readonly [string, string, string] => f[1] !== null)
+  const cited = (citation.quote ?? '').toLowerCase()
+  return (
+    <div className="space-y-4">
+      {fields.length > 0 ? (
+        <dl className="overflow-hidden rounded-xl ring-1 ring-slate-200">
+          {fields.map(([k, v, raw]) => {
+            // match the stored value: the quote is the raw row text ("2021-05-01"), not the display form
+            const used = raw.length > 2 && cited.includes(raw.toLowerCase())
+            return (
+              <div
+                key={k}
+                className={cn(
+                  'grid grid-cols-[150px_1fr] gap-3 border-b border-slate-100 px-4 py-2 text-sm last:border-0',
+                  used && 'bg-indigo-50/70',
+                )}
+              >
+                <dt className="text-slate-400">{k.replace(/_/g, ' ')}</dt>
+                <dd className={cn('break-words text-slate-800', used && 'font-medium text-indigo-900')}>{v}</dd>
+              </div>
+            )
+          })}
+        </dl>
+      ) : (
+        <p className="flex items-center gap-2 rounded-lg bg-indigo-50/60 px-3 py-2 text-sm text-indigo-800">
+          <SourceKindIcon citation={citation} className="h-4 w-4" />
+          Computed by code from database rows. No model arithmetic.
+        </p>
+      )}
+      <div>
+        <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+          Given to the model as
+        </div>
+        <div className="rounded-lg bg-slate-50 p-3.5 text-sm">
+          <Highlighted body={citation.snippet} cited={citation.quote ?? null} />
+        </div>
+      </div>
     </div>
   )
 }
