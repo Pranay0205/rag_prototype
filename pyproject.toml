@@ -1,7 +1,7 @@
 [project]
 name = "briefing"
 version = "0.1.0"
-description = "Add your description here"
+description = "Client meeting briefing intelligence: cited, verified, access-controlled briefings"
 authors = [
     { name = "Pranay0205", email = "pranayghuge@gmail.com" }
 ]
