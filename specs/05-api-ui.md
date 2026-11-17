@@ -32,6 +32,8 @@ Status: DRAFT for review
 | API-13 | `GET /clients/search?user_id&q` | Company search (TOOL-14); `notice` when only an out-of-coverage client matches |
 | API-14 | `POST /clients/{id}/ask` `{user_id, question}` | Cited, verified answer (ORC-15) |
 | API-15 | `GET /home?user_id` | Dashboard: upcoming meetings (with whether a briefing is prepared), covered companies with revenue TTM and YoY, facilities sorted by maturity |
+| API-16 | `GET /actions?user_id&client_id` | The viewer's own actions for a client (ticked suggestions, typed-in items, commitments from notes) with `origin`, so they carry into later briefings |
+| API-17 | `DELETE /actions/{id}?user_id` | Untick or remove an action; creator only |
 | API-12 | `GET /briefings/history?user_id&client_id` | The viewer's own saved versions for a client, newest first: `briefing_id`, `created_at`, `stale`, claim / verified / conflict counts. Opening one goes through API-11 with `briefing_id`, so the same access checks apply |
 
 Errors: tool error codes map to HTTP (`FORBIDDEN`/`NOT_IN_COVERAGE` → 403, `NOT_FOUND` → 404,
@@ -59,7 +61,9 @@ suspected injection). Structured sources show the database row itself (`Citation
 field table, named by table and record ID, with the sentence the model was given beneath it.
 
 **UI-5 Side rails – "Needs attention":** left: what to do before the meeting (actions by urgency,
-access notice); right: conflicts and gaps. Originally one right rail: conflicts (both values side by side + resolution),
+access notice). Every item shows where it came from (From records, From a conflict, Suggested by AI,
+From your notes, Added by you). Ticking saves an action and unticking removes it; "Add item" saves a
+typed one; saved actions reappear in the client's later briefings and ticked suggestions stay ticked; right: conflicts and gaps. Originally one right rail: conflicts (both values side by side + resolution),
 unknowns, `access_limited` notice ("Some sources are not available at your access level"),
 suggested actions with Create / Dismiss.
 

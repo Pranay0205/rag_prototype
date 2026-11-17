@@ -245,3 +245,30 @@ def test_API_15_home_respects_coverage(client):
     nw = next(c for c in alex["companies"] if c["client_id"] == "C-001")
     assert nw["revenue_ttm"] == 3400000 and nw["yoy_pct"] == -18.1
     assert alex["facilities"][0]["product"] == "Revolving Credit Facility"  # soonest maturity first
+
+
+def test_API_16_17_actions_listed_untickable_and_owner_only(client):
+    made = client.post(
+        "/api/actions",
+        json={"user_id": "alex", "client_id": "C-002", "kind": "manual", "description": "Bring fee schedule"},
+    ).json()["action_id"]
+    mine = client.get("/api/actions", params={"user_id": "alex", "client_id": "C-002"}).json()
+    assert [(a["action_id"], a["origin"]) for a in mine] == [(made, "user")]
+    assert client.get("/api/actions", params={"user_id": "kim", "client_id": "C-001"}).status_code == 403
+    assert (
+        client.delete(f"/api/actions/{made}", params={"user_id": "kim"}).status_code == 403
+    )  # not the creator
+    assert client.delete(f"/api/actions/{made}", params={"user_id": "alex"}).status_code == 200
+    assert client.get("/api/actions", params={"user_id": "alex", "client_id": "C-002"}).json() == []
+
+
+def test_ORC_8_suggestions_carry_their_origin(client):
+    briefing_id = client.post("/api/briefings", json={"user_id": "alex", "client_id": "C-001"}).json()[
+        "briefing_id"
+    ]
+    sse_events(client, briefing_id)
+    actions = client.get(f"/api/briefings/{briefing_id}", params={"user_id": "alex"}).json()[
+        "suggested_actions"
+    ]
+    origins = {a["id"].split("-")[0]: a["origin"] for a in actions}
+    assert origins["overdue"] == "records"  # open actions in the database, not the model

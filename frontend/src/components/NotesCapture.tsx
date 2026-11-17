@@ -36,6 +36,7 @@ export function NotesCapture({ clientId, userId }: Props) {
       description: c.description,
       owner: c.party === 'meridian' ? userId : null,
       due: c.due,
+      origin: 'notes',
     })
     setCreated((s) => new Set(s).add(i))
   }

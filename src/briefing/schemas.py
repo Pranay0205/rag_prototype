@@ -151,6 +151,10 @@ class Exhibits(BaseModel):
 class SuggestedAction(BaseModel):
     id: str
     kind: str  # "follow_up" | "flag_stale" | "verify_with_owner"
+    # Where the suggestion came from, set by code: an open action in the records, a detected
+    # conflict, or the model finding an untracked request in the documents. None only on briefings
+    # saved before this field existed; the UI classifies those the same way (originOf).
+    origin: Literal["records", "conflict", "ai"] | None = None
     description: str
     owner: str | None = None
     due: date | None = None

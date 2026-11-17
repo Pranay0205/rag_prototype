@@ -1,7 +1,7 @@
 // Briefing Desk: prepare -> review -> act -> close the loop (specs/05-api-ui.md).
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ApiError, api, type HistoryItem, type Meeting, type User } from './api'
-import { AttentionPanel, type ActionState } from './components/AttentionPanel'
+import { ApiError, api, type ClientAction, type HistoryItem, type Meeting, type User } from './api'
+import { AttentionPanel, originOf, type ActionState } from './components/AttentionPanel'
 import { ChatWidget } from './components/ChatWidget'
 import { HistoryMenu } from './components/HistoryMenu'
 import { ContactsExhibit, PipelineExhibit, RevenueExhibit } from './components/Exhibits'
@@ -75,6 +75,8 @@ export default function App() {
   const [view, setView] = useState<View>('briefing')
   const [reviews, setReviews] = useState<Record<string, Review>>({})
   const [actionStates, setActionStates] = useState<Record<string, ActionState>>({})
+  const [actionIds, setActionIds] = useState<Record<string, string>>({}) // suggestion id -> saved action id
+  const [mine, setMine] = useState<ClientAction[]>([]) // the viewer's own actions for this client
   const [drawer, setDrawer] = useState<Citation | null>(null)
   const [history, setHistory] = useState<HistoryItem[]>([])
   const [copied, setCopied] = useState(false)
@@ -132,6 +134,7 @@ export default function App() {
           ),
         )
         setActionStates(Object.fromEntries(saved.created_suggestions.map((id) => [id, 'created' as const])))
+        setActionIds(saved.created_actions ?? {})
       })
     },
     [userId],
@@ -144,11 +147,14 @@ export default function App() {
       setRun(IDLE)
       setReviews({})
       setActionStates({})
+      setActionIds({})
+      setMine([])
+      if (userId) api.listActions(userId, m.client_id).then(setMine)
       setHistory([])
       setView('briefing')
       openSaved(m)
     },
-    [openSaved],
+    [openSaved, userId],
   )
 
   /** Opening a meeting adds a browser history entry, so Back returns to where you came from. */
@@ -227,9 +233,19 @@ export default function App() {
     }
   }
 
-  async function act(action: SuggestedAction, state: ActionState) {
-    if (state === 'created' && meeting && userId) {
-      await api.createAction({
+  const normalize = (t: string) => t.toLowerCase().replace(/\s+/g, ' ').trim()
+  /** An action the viewer saved in an earlier briefing for the same item (closing the loop). */
+  const earlier = (a: SuggestedAction) => mine.find((m) => normalize(m.description) === normalize(a.description))
+
+  function refreshMine() {
+    if (meeting && userId) api.listActions(userId, meeting.client_id).then(setMine)
+  }
+
+  /** Tick saves the suggestion as your action; untick removes it again; dismiss hides it. */
+  async function act(action: SuggestedAction, state: ActionState | 'undo') {
+    if (!meeting || !userId) return
+    if (state === 'created') {
+      const { action_id } = await api.createAction({
         user_id: userId,
         client_id: meeting.client_id,
         kind: action.kind,
@@ -239,9 +255,32 @@ export default function App() {
         citations: action.citations.map((c) => c.source_id),
         briefing_id: run.briefingId,
         suggestion_id: action.id,
+        origin: originOf(action),
       })
+      setActionIds((ids) => ({ ...ids, [action.id]: action_id }))
+      setActionStates((s) => ({ ...s, [action.id]: 'created' }))
+    } else if (state === 'undo') {
+      const id = actionIds[action.id] ?? earlier(action)?.action_id
+      if (id) await api.deleteAction(id, userId)
+      setActionIds(({ [action.id]: _, ...rest }) => rest)
+      setActionStates(({ [action.id]: _, ...rest }) => rest)
+    } else {
+      setActionStates((s) => ({ ...s, [action.id]: state }))
     }
-    setActionStates((s) => ({ ...s, [action.id]: state }))
+    refreshMine()
+  }
+
+  async function addItem(description: string) {
+    if (!meeting || !userId) return
+    await api.createAction({
+      user_id: userId,
+      client_id: meeting.client_id,
+      kind: 'manual',
+      description,
+      briefing_id: run.briefingId,
+      origin: 'user',
+    })
+    refreshMine()
   }
 
   async function copyMarkdown() {
@@ -255,6 +294,12 @@ export default function App() {
   if (!userId) return <SignIn users={users} onSignIn={setUserId} />
   const allClaims = run.briefing?.sections.flatMap((s) => s.claims) ?? []
   const rails = !!meeting && view === 'briefing' && run.status !== 'idle'
+  const suggestions = run.briefing?.suggested_actions ?? []
+  // suggestions already saved in an earlier briefing show as ticked; other saved actions are listed as your own
+  const ticked: Record<string, ActionState> = { ...actionStates }
+  for (const a of suggestions) if (!ticked[a.id] && earlier(a)) ticked[a.id] = 'created'
+  const shown = new Set(suggestions.map((a) => normalize(a.description)))
+  const ownItems = mine.filter((m) => !shown.has(normalize(m.description)))
 
   return (
     <div className="flex h-full flex-col">
@@ -291,10 +336,13 @@ export default function App() {
                 <AttentionPanel
                   briefing={run.briefing}
                   running={run.status === 'running'}
-                  actionStates={actionStates}
+                  actionStates={ticked}
                   onAction={act}
                   onCite={setDrawer}
                   side="left"
+                  mine={ownItems}
+                  onRemoveMine={(id) => api.deleteAction(id, userId).then(refreshMine)}
+                  onAdd={addItem}
                 />
               </aside>
             )}

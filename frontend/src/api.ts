@@ -91,6 +91,7 @@ export interface SavedBriefing {
   reviews: Record<string, 'accept' | 'reject'>
   review_notes: Record<string, string> // reject reasons
   created_suggestions: string[]
+  created_actions?: Record<string, string> // suggestion_id -> action_id
 }
 
 /** API-15: the signed-in dashboard. */
@@ -133,6 +134,21 @@ export interface AskAnswer {
   conflicts: Conflict[]
   unknowns: Unknown[]
   access_limited: boolean
+}
+
+/** Where an action came from: a suggestion's origin, confirmed meeting notes, or typed in. */
+export type ActionOrigin = 'records' | 'conflict' | 'ai' | 'notes' | 'user'
+
+/** API-16 */
+export interface ClientAction {
+  action_id: string
+  kind: string
+  description: string
+  due: string | null
+  at: string
+  briefing_id: string | null
+  suggestion_id: string | null
+  origin: ActionOrigin | null
 }
 
 export interface HistoryItem {
@@ -195,7 +211,16 @@ export const api = {
     citations?: string[]
     briefing_id?: string | null
     suggestion_id?: string
+    origin?: ActionOrigin
   }) => post<{ action_id: string }>('/api/actions', action),
+
+  /** API-16: the viewer's own actions for a client, so they carry into later briefings. */
+  listActions: (userId: string, clientId: string) =>
+    request<ClientAction[]>(`/api/actions?user_id=${userId}&client_id=${clientId}`),
+
+  /** API-17: untick or remove an action (creator only). */
+  deleteAction: (actionId: string, userId: string) =>
+    request<{ ok: boolean }>(`/api/actions/${actionId}?user_id=${userId}`, { method: 'DELETE' }),
 
   /** The viewer's last saved briefing for this client (or a given version), or null if none. */
   async latestBriefing(userId: string, clientId: string, briefingId?: string): Promise<SavedBriefing | null> {

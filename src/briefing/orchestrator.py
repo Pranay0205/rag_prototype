@@ -707,6 +707,7 @@ def run_section(
         SuggestedAction(
             id=f"fu-{spec.key.value}-{i + 1}",
             kind="follow_up",
+            origin="ai",
             description=_clean(f.description),
             citations=[by_id[c].citation for c in f.cite],
         )
@@ -777,6 +778,7 @@ def deterministic_actions(
                 SuggestedAction(
                     id=f"overdue-{a['action_id']}",
                     kind="follow_up",
+                    origin="records",
                     owner=a["owner"],
                     due=a["due_date"],
                     description=f"Overdue by {a['days_overdue']} days: {a['description']}",
@@ -797,6 +799,7 @@ def deterministic_actions(
                 SuggestedAction(
                     id=f"conflict-{i + 1}",
                     kind=kind,
+                    origin="conflict",
                     description=f"{verb}: {c.topic}",
                     citations=[v.citation for v in c.values],
                 )

@@ -110,6 +110,7 @@ export const NO_EXHIBITS: Exhibits = { contacts: [], coverage: [], revenue_lines
 export interface SuggestedAction {
   id: string
   kind: string
+  origin?: 'records' | 'conflict' | 'ai' // set by code (ORC-8)
   description: string
   owner: string | null
   due: string | null

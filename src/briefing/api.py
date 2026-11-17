@@ -75,10 +75,15 @@ def init_app_db() -> None:
             );
             CREATE TABLE IF NOT EXISTS created_actions (
                 id TEXT PRIMARY KEY, client_id TEXT, kind TEXT, description TEXT, owner TEXT,
-                due TEXT, citations TEXT, created_by TEXT, at TEXT, briefing_id TEXT, suggestion_id TEXT
+                due TEXT, citations TEXT, created_by TEXT, at TEXT, briefing_id TEXT, suggestion_id TEXT,
+                origin TEXT
             );
             """
         )
+        # app.db outlives code versions: add columns introduced after it was created
+        cols = {r["name"] for r in rows(conn, "PRAGMA table_info(created_actions)")}
+        if "origin" not in cols:
+            conn.execute("ALTER TABLE created_actions ADD COLUMN origin TEXT")
 
 
 def data_built_at() -> str | None:
@@ -294,18 +299,21 @@ def latest_briefing(user_id: str, client_id: str, briefing_id: str | None = None
         review_notes[x["claim_id"]] = x["note"] or ""
         if x["decision"] == "clear":
             del reviews[x["claim_id"]], review_notes[x["claim_id"]]
-    created = [
-        x["suggestion_id"]
-        for x in rows(conn, "SELECT suggestion_id FROM created_actions WHERE briefing_id=?", (b.briefing_id,))
+    created = {
+        x["suggestion_id"]: x["id"]
+        for x in rows(
+            conn, "SELECT id, suggestion_id FROM created_actions WHERE briefing_id=?", (b.briefing_id,)
+        )
         if x["suggestion_id"]
-    ]
+    }
     return {
         "briefing": b,
         "created_at": r["created_at"],
         "stale": r["data_built_at"] != data_built_at(),
         "reviews": reviews,
         "review_notes": review_notes,
-        "created_suggestions": created,
+        "created_suggestions": list(created),
+        "created_actions": created,  # suggestion_id -> action_id, so a tick can be undone
     }
 
 
@@ -394,16 +402,21 @@ class NewAction(BaseModel):
     citations: list[str] = []
     briefing_id: str | None = None
     suggestion_id: str | None = None
+    # records | conflict | ai (a ticked suggestion), notes (confirmed from meeting notes), user (typed in)
+    origin: str = "user"
 
 
 @app.post("/api/actions")
 def create_action(a: NewAction):
+    """API-8: create an action, either by ticking a suggestion or by typing one in."""
     t = tools()
     raise_for(t.get_client_profile(viewer_or_404(t, a.user_id), a.client_id))  # coverage check
     action_id = f"N-{uuid.uuid4().hex[:6]}"
     with app_db() as conn:
         conn.execute(
-            "INSERT INTO created_actions VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            """INSERT INTO created_actions (id, client_id, kind, description, owner, due, citations,
+                                          created_by, at, briefing_id, suggestion_id, origin)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 action_id,
                 a.client_id,
@@ -416,9 +429,41 @@ def create_action(a: NewAction):
                 datetime.now().isoformat(),
                 a.briefing_id,
                 a.suggestion_id,
+                a.origin,
             ),
         )
     return {"action_id": action_id}
+
+
+@app.get("/api/actions")
+def list_actions(user_id: str, client_id: str):
+    """API-16: the viewer's own actions for a client, newest first, so they carry into later
+    briefings. Coverage is re-checked."""
+    t = tools()
+    raise_for(t.get_client_profile(viewer_or_404(t, user_id), client_id))
+    with app_db() as conn:
+        found = rows(
+            conn,
+            "SELECT * FROM created_actions WHERE created_by=? AND client_id=? ORDER BY at DESC",
+            (user_id, client_id),
+        )
+    keys = ["kind", "description", "due", "at", "briefing_id", "suggestion_id", "origin"]
+    return [{"action_id": r["id"], **{k: r[k] for k in keys}} for r in found]
+
+
+@app.delete("/api/actions/{action_id}")
+def delete_action(action_id: str, user_id: str):
+    """API-17: untick or remove an action. Only its creator can."""
+    with app_db() as conn:
+        r = rows(conn, "SELECT created_by FROM created_actions WHERE id=?", (action_id,))
+        if not r:
+            raise HTTPException(404, {"code": "NOT_FOUND", "message": "No such action"})
+        if r[0]["created_by"] != user_id:
+            raise HTTPException(
+                403, {"code": "FORBIDDEN", "message": "Only the creator can remove an action"}
+            )
+        conn.execute("DELETE FROM created_actions WHERE id=?", (action_id,))
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------- API-9 post-meeting notes

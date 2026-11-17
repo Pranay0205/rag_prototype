@@ -1,6 +1,7 @@
 // UI-5: what the banker must not miss, as cards beside the briefing: actions on the left (what to
 // do before the meeting), conflicts and gaps on the right (what not to rely on).
-import { useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
+import type { ActionOrigin, ClientAction } from '../api'
 import type { Briefing, Citation, Conflict, ConflictValue, SuggestedAction } from '../types'
 import { SourceKindIcon } from './SectionCard'
 import { CARD, CardHeader, GLYPH, Spinner, cn, readable } from './ui'
@@ -11,12 +12,15 @@ interface Props {
   briefing: Briefing | null
   running: boolean
   actionStates: Record<string, ActionState>
-  onAction: (action: SuggestedAction, state: ActionState) => void
+  onAction: (action: SuggestedAction, state: ActionState | 'undo') => void
   onCite: (citation: Citation) => void
   side: 'left' | 'right'
+  mine?: ClientAction[] // the viewer's own actions not among this briefing's suggestions
+  onRemoveMine?: (actionId: string) => void
+  onAdd?: (description: string) => Promise<void>
 }
 
-export function AttentionPanel({ briefing, running, actionStates, onAction, onCite, side }: Props) {
+export function AttentionPanel({ briefing, running, actionStates, onAction, onCite, side, mine = [], onRemoveMine, onAdd }: Props) {
   const [allUnknowns, setAllUnknowns] = useState(false)
   const actions = (briefing?.suggested_actions.filter((a) => actionStates[a.id] !== 'dismissed') ?? []).sort(
     (a, b) => urgency(a) - urgency(b),
@@ -37,7 +41,7 @@ export function AttentionPanel({ briefing, running, actionStates, onAction, onCi
     return (
       <section className={CARD}>
         <div className="px-5 pb-3 pt-5">
-          <CardHeader icon={GLYPH.actions} title="Before the meeting" count={actions.length} />
+          <CardHeader icon={GLYPH.actions} title="Before the meeting" count={actions.length + mine.length} />
         </div>
         {briefing.access_limited && (
           <p className="mx-5 mb-2 flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
@@ -50,12 +54,16 @@ export function AttentionPanel({ briefing, running, actionStates, onAction, onCi
             Some sources are restricted for your profile
           </p>
         )}
-        {actions.length === 0 && <p className="px-5 pb-5 text-sm text-slate-400">Nothing outstanding.</p>}
+        {actions.length + mine.length === 0 && <p className="px-5 pb-3 text-sm text-slate-400">Nothing outstanding.</p>}
         <ul className="divide-y divide-slate-100">
           {actions.map((a) => (
             <ActionRow key={a.id} action={a} created={actionStates[a.id] === 'created'} onAction={onAction} />
           ))}
+          {mine.map((m) => (
+            <MineRow key={m.action_id} action={m} onRemove={() => onRemoveMine?.(m.action_id)} />
+          ))}
         </ul>
+        {onAdd && <AddItem onAdd={onAdd} />}
       </section>
     )
   }
@@ -113,15 +121,16 @@ function ActionRow({
 }: {
   action: SuggestedAction
   created: boolean
-  onAction: (action: SuggestedAction, state: ActionState) => void
+  onAction: (action: SuggestedAction, state: ActionState | 'undo') => void
 }) {
   const overdue = /^Overdue by (\d+) days?: (.*)$/s.exec(a.description)
   const text = overdue ? overdue[2] : a.description
   return (
     <li className="group flex items-start gap-3 px-5 py-3.5">
       <button
-        onClick={() => !created && onAction(a, 'created')}
-        title={created ? 'Created' : 'Create follow-up'}
+        onClick={() => onAction(a, created ? 'undo' : 'created')}
+        title={created ? 'Untick: remove from your actions' : 'Add to your actions'}
+        aria-pressed={created}
         className={cn(
           'mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full ring-1 transition',
           created
@@ -150,6 +159,7 @@ function ActionRow({
           )}
           {readable(text)}
         </p>
+        {!created && <OriginTag origin={originOf(a)} />}
       </div>
       {!created && (
         <button
@@ -163,6 +173,112 @@ function ActionRow({
         </button>
       )}
     </li>
+  )
+}
+
+const ORIGIN: Record<ActionOrigin, { label: string; className: string; icon: ReactNode }> = {
+  records: { label: 'From records', className: 'text-slate-500', icon: <path d="M4 5c0-1.4 2.7-2.5 6-2.5s6 1.1 6 2.5v10c0 1.4-2.7 2.5-6 2.5S4 16.4 4 15V5Zm0 0c0 1.4 2.7 2.5 6 2.5S16 6.4 16 5M4 10c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5" /> },
+  conflict: { label: 'From a conflict', className: 'text-amber-700', icon: <path d="M7 4 3.5 7.5 7 11M3.5 7.5h10M13 9l3.5 3.5L13 16m3.5-3.5h-10" /> },
+  ai: { label: 'Suggested by AI', className: 'text-indigo-600', icon: <path d="M10 2.5 11.6 8.4 17.5 10l-5.9 1.6L10 17.5l-1.6-5.9L2.5 10l5.9-1.6L10 2.5Z" /> },
+  notes: { label: 'From your notes', className: 'text-emerald-700', icon: <path d="M5.5 2.5h6.5l3.5 3.5v11.5h-10zM8 10h5M8 13h5" /> },
+  user: { label: 'Added by you', className: 'text-emerald-700', icon: <path d="M10 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-5.5 7a5.5 5.5 0 0 1 11 0" /> },
+}
+
+/** A suggestion's origin. Briefings saved before the field existed are classified the same way code
+ * creates them: overdue items come from records, verify / flag items from conflicts (ORC-8). */
+export function originOf(a: SuggestedAction): ActionOrigin {
+  if (a.origin) return a.origin
+  if (a.id.startsWith('overdue-')) return 'records'
+  if (a.kind === 'verify_with_owner' || a.kind === 'flag_stale') return 'conflict'
+  return 'ai'
+}
+
+/** Where an item came from, so a database fact never looks like an AI suggestion. */
+function OriginTag({ origin }: { origin: ActionOrigin }) {
+  const o = ORIGIN[origin] ?? ORIGIN.ai
+  return (
+    <span className={cn('mt-1 inline-flex items-center gap-1 text-[11px] font-medium', o.className)}>
+      <Icon className="h-3 w-3">{o.icon}</Icon>
+      {o.label}
+    </span>
+  )
+}
+
+/** One of the viewer's own actions: added by hand, confirmed from notes, or ticked in an earlier briefing. */
+function MineRow({ action: m, onRemove }: { action: ClientAction; onRemove: () => void }) {
+  return (
+    <li className="flex items-start gap-3 px-5 py-3.5">
+      <button
+        onClick={onRemove}
+        title="Untick: remove from your actions"
+        aria-pressed
+        className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-emerald-500 text-white ring-1 ring-emerald-500 transition hover:bg-white hover:text-slate-400 hover:ring-slate-300"
+      >
+        <svg viewBox="0 0 20 20" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path d="M5 10.5 8.5 14 15 6" />
+        </svg>
+      </button>
+      <div className="flex-1 text-[13px] leading-snug text-slate-700">
+        <p>{readable(m.description)}</p>
+        <OriginTag origin={m.origin ?? 'user'} />
+        <span className="ml-1.5 text-[11px] text-slate-400">· {readable(m.at.slice(0, 10))}</span>
+      </div>
+    </li>
+  )
+}
+
+/** Type an item of your own; it is saved with your name and appears in this client's later briefings. */
+function AddItem({ onAdd }: { onAdd: (description: string) => Promise<void> }) {
+  const [open, setOpen] = useState(false)
+  const [text, setText] = useState('')
+  const [saving, setSaving] = useState(false)
+  const input = useRef<HTMLInputElement>(null)
+  if (!open) {
+    return (
+      <button
+        onClick={() => {
+          setOpen(true)
+          setTimeout(() => input.current?.focus())
+        }}
+        className="flex w-full items-center gap-2 border-t border-slate-100 px-5 py-3 text-left text-[13px] font-medium text-indigo-600 transition hover:bg-slate-50"
+      >
+        <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <path d="M10 4.5v11M4.5 10h11" strokeLinecap="round" />
+        </svg>
+        Add item
+      </button>
+    )
+  }
+  return (
+    <form
+      onSubmit={async (e) => {
+        e.preventDefault()
+        if (!text.trim()) return
+        setSaving(true)
+        await onAdd(text.trim())
+        setSaving(false)
+        setText('')
+        setOpen(false)
+      }}
+      className="flex items-center gap-2 border-t border-slate-100 px-4 py-3"
+    >
+      <input
+        ref={input}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
+        placeholder="e.g. Bring the revised fee schedule"
+        aria-label="New item"
+        className="h-9 flex-1 rounded-lg bg-slate-100/80 px-3 text-[13px] text-slate-800 outline-none ring-1 ring-transparent placeholder:text-slate-400 focus:bg-white focus:ring-indigo-300"
+      />
+      <button
+        type="submit"
+        disabled={!text.trim() || saving}
+        className="h-9 rounded-lg bg-indigo-600 px-3 text-[13px] font-medium text-white transition hover:bg-indigo-500 disabled:opacity-40"
+      >
+        Add
+      </button>
+    </form>
   )
 }
 
