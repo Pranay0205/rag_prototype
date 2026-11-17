@@ -1,6 +1,6 @@
 # 03 — Tool contracts
 
-Status: DRAFT for review · Module: `briefing.tools` · No LLM calls inside tools.
+Status: Implemented in the prototype · Module: `briefing.tools` · No LLM calls inside tools.
 
 Tools are methods on `Tools(conn)`. The envelope is a typed Pydantic model; `data` is a plain
 dict/list whose shape is documented on each tool (per-tool output models are a planned
@@ -55,14 +55,14 @@ arithmetic is done by code, never by the model.
 | ID | Signature | Returns | Notes |
 |---|---|---|---|
 | TOOL-4 | `resolve_client(viewer, query)` | `[{client_id, name, confidence, method}]` | ING-3; `AMBIGUOUS` if top two within 0.05; `NOT_IN_COVERAGE` if the only match is outside coverage |
-| TOOL-5 | `get_client_profile(viewer, client_id)` | master record, aliases, merged IDs, coverage team, contacts (active + changed in last 180 days, with start/end dates) | Contact changes feed "what changed" |
+| TOOL-5 | `get_client_profile(viewer, client_id)` | master record, aliases, merged IDs, coverage team, contacts (active + changed in last 180 days, with start/end dates) | Contact changes feed "what changed". Deal-team coverage is returned only to members of that deal team (DATA-2): its existence reveals a deal |
 | TOOL-6 | `get_revenue(viewer, client_id)` | per product line: current TTM, prior TTM, YoY %, last 8 quarters | Warning + no TTM if any of the last 4 quarters is missing (T8) |
-| TOOL-7 | `get_holdings(viewer, client_id)` | holdings incl. maturity within 12 months flag | |
+| TOOL-7 | `get_holdings(viewer, client_id)` | holdings incl. maturity within 12 months flag | A "Products held" summary lists the complete set, so absence is citable ("holds no term loan"); "within 12 months" is written into the source text, computed by code |
 | TOOL-8 | `get_financials(viewer, client_id)` | company revenue, EBITDA margin, leverage by period | |
 | TOOL-9 | `get_pipeline(viewer, client_id)` | opportunities (row-level entitlement), service issues, open actions with `overdue` computed vs today | |
 | TOOL-10 | `get_interactions(viewer, client_id, limit)` | interaction log + `last_interaction_date` | Defines the "since" cut-off for changes |
 | TOOL-11 | `search_documents(viewer, client_id, queries, doc_types=None, since=None, k=8)` | ranked chunks | `queries` is one string or a list; each query is ranked by BM25 and by vector similarity, and all rankings are fused with reciprocal-rank fusion (query embeddings batched). Candidate set = chunks linked to the client **plus** unlinked `research` / `product_update` chunks (firm-wide content that supports opportunities); unlinked news is never included (T10). Filters (entitlement, client link, not duplicate, approved, type, date) apply **before** ranking. Chunks carry `derived`, `stale`, `suspected_injection`, `link_method`, `link_confidence` |
-| TOOL-13 | `get_meetings(viewer, client_id=None)` | upcoming meetings in the viewer's coverage | Used by ORC-1 (meeting header) and API-2 |
+| TOOL-13 | `get_meetings(viewer, client_id=None)` | upcoming meetings in the viewer's coverage | Used by ORC-1 (meeting header), API-2 and ORC-16. Citable: one source per meeting plus a summary with the count and "this week", computed by code |
 | TOOL-14 | `search_clients(viewer, query)` | covered clients from free text: a typed prefix of a legal name or alias, or a name mentioned inside a sentence ("overdue for NWL?"); falls back to TOOL-4 | A match outside coverage is reported without naming the client (API-13) |
 | TOOL-15 | `list_documents(viewer, client_id)` | the client's documents the viewer may see, newest first: metadata only (type, title, date, classification, derived, link method) | Duplicates and quarantined news excluded; entitlements applied (DATA-1), `access_limited` when some are hidden; text is read through API-6 |
 | TOOL-12 | MCP exposure | — | Extension: same functions registered as MCP tools; not in v1 |

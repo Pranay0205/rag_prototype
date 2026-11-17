@@ -1,6 +1,6 @@
 # 02 — Ingestion & unification
 
-Status: DRAFT for review · Entry point: `uv run python -m briefing.ingest` · No LLM calls.
+Status: Implemented in the prototype · Entry point: `uv run python -m briefing.ingest` · No LLM calls.
 
 Output: `var/briefing.db` (SQLite) + `var/ingestion_report.json`. Re-running is idempotent
 (drops and rebuilds).

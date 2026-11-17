@@ -1,6 +1,6 @@
 # 05 — API & briefing workspace UX
 
-Status: DRAFT for review
+Status: Implemented in the prototype
 
 ## Workflow the UI supports
 
@@ -109,15 +109,26 @@ opens its source in the drawer. Straight from the database, so it loads instantl
 shows when the data was loaded and the newest record per source (revenue quarter, CRM activity, email,
 notes, news, financials), so a stale feed is visible.
 
-**UI-15 Data page (`#/data`):** what sits under the banker's screens, from API-19. It has four parts:
-- headline counts;
-- the data model, grouped (Clients, Money, Activity, Documents), with each table's columns marked as
-  key, link or lineage;
-- what unification did, step by step (merge with its evidence, alias matching, document linking,
-  duplicates removed, secondary and stale marking, held-back news and injection, indexing);
-- the quality checks, each opening its SQL and failing rows.
+**UI-15 Data page (`#/data`):** what sits under the banker's screens, from API-19. It shows less by
+default:
+- one summary line: tables, clients and merges, checks passed, load time;
+- the data model as a hub diagram, with clients in the middle; selecting a table shows its columns,
+  marked as key, link or lineage;
+- "Needs attention": only the merge and any gaps or failing checks.
+
+Behind one button: what unification did, step by step (merge with its evidence, alias matching,
+document linking, duplicates removed, secondary and stale marking, sources not used, indexing), and
+the quality checks, each opening its SQL and failing rows.
 
 The source drawer's Calculation tab (TOOL-16) is the per-figure view of the same idea.
+
+**UI-16 Card explanations:** every card that shows a number or a list (the client page's figures and
+panels, the briefing's key figures) has an info icon. On hover or keyboard focus it shows two or three
+sentences on what the card shows and where the figure comes from. One shared component.
+
+**UI-17 Writing standard:** user-facing copy follows ASD-STE100 Simplified Technical English to about
+85%: short sentences, active voice, one idea per sentence, technical names kept as they are. No
+em-dashes.
 
 **UI-13 Ask chat:** a hovering ask bar at the bottom centre of every page, plus "Ask about <client>" in the
 briefing header and "Ask about this client" on Home; the panel opens in place and can switch client

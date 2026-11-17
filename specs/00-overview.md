@@ -1,6 +1,6 @@
 # 00 — Overview: Client Meeting Briefing Intelligence
 
-Status: DRAFT for review · Owner: Pranay · Last updated: 2026-11-16
+Status: Implemented in the prototype · Owner: Pranay · Last updated: 2026-11-17
 
 ## Problem
 
@@ -88,7 +88,9 @@ open commitments, repeats stale facts, and can leak restricted information.
 | Citation validity, number checks | No | Deterministic verifier |
 | Claim-supported-by-snippet check | **Yes (fast model)** | Semantic entailment |
 | Extracting commitments from post-meeting notes | **Yes (fast model)** | Free text → structured; human confirms |
-| Eval: fact recall judging | **Yes (fast model)** | Paraphrase-tolerant matching; string checks for forbidden content |
+| Choosing tools for a question across clients (ORC-16) | **Yes (fast model)** | Free-form questions need a plan; the tools still enforce access |
+| Explaining the app's own labels (ORC-15) | No (written glossary) | A model guessed what "Check sources" means and got it wrong |
+| Eval: fact recall judging | **Yes (`LLM_MODEL_EVAL`, deepseek-reasoner)** | A different model from the writer; string checks for forbidden content |
 
 ## Stack
 
