@@ -545,6 +545,16 @@ class Tools:
             )
             for h in hs
         ]
+        # The complete list as one fact, so absence is citable ("no term loan", "the only facility")
+        listed = "; ".join(
+            h["product"]
+            + (f" ({_usd(h['notional_usd'])}, matures {h['maturity_date']})" if h["notional_usd"] else "")
+            for h in hs
+        )
+        summary = (
+            f"{len(hs)} products held: {listed}. This is the complete list." if hs else "No products held."
+        )
+        sources.insert(0, _sql_source(f"holdings/{cid}/summary", "Products held", summary))
         return ToolResult(ok=True, data=hs, sources=sources)
 
     # ------------------------------------------------------------ TOOL-8
