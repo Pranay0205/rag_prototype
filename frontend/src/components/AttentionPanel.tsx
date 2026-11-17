@@ -1,4 +1,5 @@
-// UI-5: what the banker must not miss. Kept short: conflicts, gaps, actions.
+// UI-5: what the banker must not miss, on both sides of the briefing: actions on the left (what to
+// do before the meeting), conflicts and gaps on the right (what not to rely on).
 import { useState, type ReactNode } from 'react'
 import type { Briefing, Citation, Conflict, ConflictValue, SuggestedAction } from '../types'
 import { SourceKindIcon } from './SectionCard'
@@ -12,9 +13,10 @@ interface Props {
   actionStates: Record<string, ActionState>
   onAction: (action: SuggestedAction, state: ActionState) => void
   onCite: (citation: Citation) => void
+  side: 'left' | 'right'
 }
 
-export function AttentionPanel({ briefing, running, actionStates, onAction, onCite }: Props) {
+export function AttentionPanel({ briefing, running, actionStates, onAction, onCite, side }: Props) {
   const [allUnknowns, setAllUnknowns] = useState(false)
   const actions = (briefing?.suggested_actions.filter((a) => actionStates[a.id] !== 'dismissed') ?? []).sort(
     (a, b) => urgency(a) - urgency(b),
@@ -22,8 +24,15 @@ export function AttentionPanel({ briefing, running, actionStates, onAction, onCi
   const unknowns = briefing ? (allUnknowns ? briefing.unknowns : briefing.unknowns.slice(0, 3)) : []
 
   return (
-    <aside className="w-[340px] shrink-0 overflow-y-auto border-l border-slate-200/70 bg-white/60 px-5 py-7 backdrop-blur">
-      <h2 className="text-[15px] font-semibold tracking-tight text-slate-900">Attention</h2>
+    <aside
+      className={cn(
+        'w-[340px] shrink-0 overflow-y-auto border-slate-200/70 bg-white/60 px-5 py-7 backdrop-blur',
+        side === 'left' ? 'border-r' : 'border-l pb-28', // room to scroll the last card above the chat button
+      )}
+    >
+      <h2 className="text-[15px] font-semibold tracking-tight text-slate-900">
+        {side === 'left' ? 'Attention' : 'Conflicts & gaps'}
+      </h2>
 
       {!briefing && running && (
         <div className="mt-4 flex items-center gap-2 text-sm text-slate-400">
@@ -33,7 +42,7 @@ export function AttentionPanel({ briefing, running, actionStates, onAction, onCi
 
       {briefing && (
         <div className="mt-5 space-y-7">
-          {briefing.access_limited && (
+          {side === 'left' && briefing.access_limited && (
             <p className="flex items-center gap-2 text-xs text-slate-500">
               <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
                 <path
@@ -46,89 +55,95 @@ export function AttentionPanel({ briefing, running, actionStates, onAction, onCi
           )}
 
           {/* What to do before the meeting comes first: overdue commitments, then checks, then follow-ups */}
-          <Group title="Before the meeting" count={actions.length} tone="text-indigo-600">
-            {actions.map((a) => {
-              const created = actionStates[a.id] === 'created'
-              const overdue = /^Overdue by (\d+) days?: (.*)$/s.exec(a.description)
-              const text = overdue ? overdue[2] : a.description
-              return (
-                <div key={a.id} className="group flex items-start gap-2.5">
-                  <button
-                    onClick={() => !created && onAction(a, 'created')}
-                    title={created ? 'Created' : 'Create follow-up'}
-                    className={cn(
-                      'mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full ring-1 transition',
-                      created
-                        ? 'bg-emerald-500 text-white ring-emerald-500'
-                        : 'text-transparent ring-slate-300 hover:text-indigo-500 hover:ring-indigo-400',
-                    )}
-                  >
-                    <svg viewBox="0 0 20 20" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <path d="M5 10.5 8.5 14 15 6" />
-                    </svg>
-                  </button>
-                  <div className={cn('flex-1 text-[13px] leading-snug', created ? 'text-slate-400 line-through' : 'text-slate-700')}>
-                    {overdue && !created && (
-                      <span className="mb-1 inline-flex items-center gap-1 rounded-md bg-rose-50 px-1.5 py-0.5 text-[11px] font-semibold text-rose-700 ring-1 ring-inset ring-rose-200">
-                        <Icon className="h-3 w-3">
-                          <path d="M10 5.5V10l3 2M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" />
-                        </Icon>
-                        {overdue[1]} days overdue
-                      </span>
-                    )}
-                    <p>
-                      {!overdue && (
-                        <span className={cn('mr-1.5 inline-flex align-[-2px]', created ? 'text-slate-300' : ACTION_KINDS[a.kind]?.tone)}>
-                          <Icon className="h-3.5 w-3.5">{ACTION_KINDS[a.kind]?.icon ?? ACTION_KINDS.follow_up.icon}</Icon>
-                        </span>
-                      )}
-                      {readable(text)}
-                    </p>
-                  </div>
-                  {!created && (
+          {side === 'left' && (
+            <Group title="Before the meeting" count={actions.length} tone="text-indigo-600">
+              {actions.map((a) => {
+                const created = actionStates[a.id] === 'created'
+                const overdue = /^Overdue by (\d+) days?: (.*)$/s.exec(a.description)
+                const text = overdue ? overdue[2] : a.description
+                return (
+                  <div key={a.id} className="group flex items-start gap-2.5">
                     <button
-                      onClick={() => onAction(a, 'dismissed')}
-                      title="Dismiss"
-                      className="text-slate-300 opacity-0 transition hover:text-slate-500 group-hover:opacity-100"
+                      onClick={() => !created && onAction(a, 'created')}
+                      title={created ? 'Created' : 'Create follow-up'}
+                      className={cn(
+                        'mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full ring-1 transition',
+                        created
+                          ? 'bg-emerald-500 text-white ring-emerald-500'
+                          : 'text-transparent ring-slate-300 hover:text-indigo-500 hover:ring-indigo-400',
+                      )}
                     >
-                      <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M6 6l8 8M14 6l-8 8" />
+                      <svg viewBox="0 0 20 20" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M5 10.5 8.5 14 15 6" />
                       </svg>
                     </button>
-                  )}
-                </div>
-              )
-            })}
-          </Group>
+                    <div className={cn('flex-1 text-[13px] leading-snug', created ? 'text-slate-400 line-through' : 'text-slate-700')}>
+                      {overdue && !created && (
+                        <span className="mb-1 inline-flex items-center gap-1 rounded-md bg-rose-50 px-1.5 py-0.5 text-[11px] font-semibold text-rose-700 ring-1 ring-inset ring-rose-200">
+                          <Icon className="h-3 w-3">
+                            <path d="M10 5.5V10l3 2M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" />
+                          </Icon>
+                          {overdue[1]} days overdue
+                        </span>
+                      )}
+                      <p>
+                        {!overdue && (
+                          <span className={cn('mr-1.5 inline-flex align-[-2px]', created ? 'text-slate-300' : ACTION_KINDS[a.kind]?.tone)}>
+                            <Icon className="h-3.5 w-3.5">{ACTION_KINDS[a.kind]?.icon ?? ACTION_KINDS.follow_up.icon}</Icon>
+                          </span>
+                        )}
+                        {readable(text)}
+                      </p>
+                    </div>
+                    {!created && (
+                      <button
+                        onClick={() => onAction(a, 'dismissed')}
+                        title="Dismiss"
+                        className="text-slate-300 opacity-0 transition hover:text-slate-500 group-hover:opacity-100"
+                      >
+                        <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M6 6l8 8M14 6l-8 8" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </Group>
+          )}
 
-          <Group title="Conflicts" count={briefing.conflicts.length} tone="text-amber-600">
-            {/* sources that disagree need action, so they come before plain updates */}
-            {[...briefing.conflicts]
-              .sort((a, b) => Number(isUpdate(a)) - Number(isUpdate(b)))
-              .map((c) => (
-                <ConflictCard key={c.topic} conflict={c} onCite={onCite} />
-              ))}
-          </Group>
+          {side === 'right' && (
+            <>
+              <Group title="Conflicts" count={briefing.conflicts.length} tone="text-amber-600">
+                {/* sources that disagree need action, so they come before plain updates */}
+                {[...briefing.conflicts]
+                  .sort((a, b) => Number(isUpdate(a)) - Number(isUpdate(b)))
+                  .map((c) => (
+                    <ConflictCard key={c.topic} conflict={c} onCite={onCite} />
+                  ))}
+              </Group>
 
-          <Group title="Gaps" count={briefing.unknowns.length} tone="text-slate-500">
-            {unknowns.map((u) => (
-              <p key={u.question} className="flex gap-2 text-[13px] leading-snug text-slate-600" title={u.reason}>
-                <Icon className="mt-[1px] h-4 w-4 shrink-0 text-slate-400">
-                  <path d="M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" />
-                  <path d="M8 8a2 2 0 1 1 2.8 1.8c-.5.2-.8.7-.8 1.2v.5M10 14h.01" strokeLinecap="round" />
-                </Icon>
-                {readable(u.question)}
-              </p>
-            ))}
-            {briefing.unknowns.length > 3 && (
-              <button
-                onClick={() => setAllUnknowns((v) => !v)}
-                className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
-              >
-                {allUnknowns ? 'Show less' : `Show ${briefing.unknowns.length - 3} more`}
-              </button>
-            )}
-          </Group>
+              <Group title="Gaps" count={briefing.unknowns.length} tone="text-slate-500">
+                {unknowns.map((u) => (
+                  <p key={u.question} className="flex gap-2 text-[13px] leading-snug text-slate-600" title={u.reason}>
+                    <Icon className="mt-[1px] h-4 w-4 shrink-0 text-slate-400">
+                      <path d="M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" />
+                      <path d="M8 8a2 2 0 1 1 2.8 1.8c-.5.2-.8.7-.8 1.2v.5M10 14h.01" strokeLinecap="round" />
+                    </Icon>
+                    {readable(u.question)}
+                  </p>
+                ))}
+                {briefing.unknowns.length > 3 && (
+                  <button
+                    onClick={() => setAllUnknowns((v) => !v)}
+                    className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
+                  >
+                    {allUnknowns ? 'Show less' : `Show ${briefing.unknowns.length - 3} more`}
+                  </button>
+                )}
+              </Group>
+            </>
+          )}
         </div>
       )}
     </aside>

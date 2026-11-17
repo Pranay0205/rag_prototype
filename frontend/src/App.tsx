@@ -265,6 +265,17 @@ export default function App() {
         onSignOut={() => setUserId(null)}
       />
       <div className="flex min-h-0 flex-1">
+        {/* Actions on the left, read first; conflicts and gaps on the right */}
+        {meeting && view === 'briefing' && run.status !== 'idle' && (
+          <AttentionPanel
+            briefing={run.briefing}
+            running={run.status === 'running'}
+            actionStates={actionStates}
+            onAction={act}
+            onCite={setDrawer}
+            side="left"
+          />
+        )}
         <main className="min-w-0 flex-1 overflow-y-auto">
           {!meeting && (
             <HomeDashboard
@@ -340,8 +351,10 @@ export default function App() {
             actionStates={actionStates}
             onAction={act}
             onCite={setDrawer}
+            side="right"
           />
         )}
+
 
       </div>
 

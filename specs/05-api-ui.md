@@ -58,7 +58,8 @@ cited sentence highlighted, source type, date and authority flags (derived, stal
 suspected injection). Structured sources show the database row itself (`Citation.record`) as a
 field table, named by table and record ID, with the sentence the model was given beneath it.
 
-**UI-5 Right rail – "Needs attention":** conflicts (both values side by side + resolution),
+**UI-5 Side rails – "Needs attention":** left: what to do before the meeting (actions by urgency,
+access notice); right: conflicts and gaps. Originally one right rail: conflicts (both values side by side + resolution),
 unknowns, `access_limited` notice ("Some sources are not available at your access level"),
 suggested actions with Create / Dismiss.
 
@@ -84,7 +85,7 @@ company search box was tried and removed: the home cards list every covered clie
 picks its client. API-13 remains available. Browser Back / Forward and reload follow the open
 meeting (`#/meeting/<id>`); the briefing page has a Home link.
 
-**UI-13 Ask chat:** a floating chat on every page (bottom left, clear of the attention panel). Typing is never blocked. While
+**UI-13 Ask chat:** a floating chat on every page (bottom right, clear of the attention panel on the left). Typing is never blocked. While
 the user types, the client named in the question is detected (API-13, aliases included) and shown
 ("About Northwind Logistics, from NWL"); otherwise the client on screen is used; with neither, the
 chat keeps the question and asks which client it is about. Suggested questions; each answer shows

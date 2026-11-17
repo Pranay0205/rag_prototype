@@ -109,7 +109,7 @@ export function ChatWidget({ userId, clients, currentClientId, onCite }: Props) 
     return (
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 left-6 z-30 inline-flex items-center gap-2.5 rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 py-3 pl-4 pr-5 text-sm font-semibold text-white shadow-[0_12px_32px_-8px_rgba(79,70,229,0.6)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_40px_-8px_rgba(79,70,229,0.7)]"
+        className="fixed bottom-6 right-6 z-30 inline-flex items-center gap-2.5 rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 py-3 pl-4 pr-5 text-sm font-semibold text-white shadow-[0_12px_32px_-8px_rgba(79,70,229,0.6)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_40px_-8px_rgba(79,70,229,0.7)]"
       >
         <ChatIcon className="h-5 w-5" />
         {client ? `Ask about ${shortName(client.name)}` : 'Ask'}
@@ -121,7 +121,7 @@ export function ChatWidget({ userId, clients, currentClientId, onCite }: Props) 
     <section
       role="dialog"
       aria-label="Ask about a client"
-      className="rise fixed bottom-6 left-6 z-30 flex h-[620px] max-h-[calc(100vh-7rem)] w-[420px] flex-col overflow-hidden rounded-2xl bg-white shadow-[0_24px_64px_-12px_rgba(15,23,42,0.35)] ring-1 ring-slate-900/10"
+      className="rise fixed bottom-6 right-6 z-30 flex h-[620px] max-h-[calc(100vh-7rem)] w-[420px] flex-col overflow-hidden rounded-2xl bg-white shadow-[0_24px_64px_-12px_rgba(15,23,42,0.35)] ring-1 ring-slate-900/10"
     >
       <header className="flex items-center gap-3 bg-gradient-to-br from-indigo-600 to-violet-600 px-4 py-3.5 text-white">
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/15 text-[13px] font-semibold ring-1 ring-white/20">
