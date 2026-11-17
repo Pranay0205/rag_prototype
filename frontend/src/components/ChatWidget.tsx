@@ -112,11 +112,9 @@ export function ChatWidget({ userId, clients, currentClientId, open, onOpenChang
     return (
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-5 left-1/2 z-30 flex w-[min(560px,calc(100vw-48px))] -translate-x-1/2 items-center gap-3 rounded-full border border-slate-200 bg-white/95 py-2 pl-2 pr-5 text-left shadow-[0_12px_32px_-12px_rgba(26,24,20,0.35)] backdrop-blur transition hover:-translate-y-0.5 hover:border-slate-300"
+        className={cn(SURFACE, 'flex items-center gap-3 rounded-full bg-white/95 py-2 pl-2 pr-5 text-left backdrop-blur transition hover:-translate-y-0.5 hover:border-slate-300')}
       >
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-900 text-white">
-          <ChatIcon className="h-4.5 w-4.5" />
-        </span>
+        <InkDot />
         <span className="flex-1 truncate text-[14px] text-slate-500">
           {client ? `Ask anything about ${shortName(client.name)}` : 'Ask about any client you cover'}
         </span>
@@ -129,21 +127,19 @@ export function ChatWidget({ userId, clients, currentClientId, open, onOpenChang
     <section
       role="dialog"
       aria-label="Ask about a client"
-      className="rise fixed bottom-5 left-1/2 z-30 flex h-[620px] max-h-[calc(100vh-7rem)] w-[min(560px,calc(100vw-48px))] -translate-x-1/2 flex-col overflow-hidden rounded-2xl bg-white shadow-[0_24px_64px_-12px_rgba(15,23,42,0.35)] ring-1 ring-slate-900/10"
+      className={cn(SURFACE, 'rise flex h-[620px] bg-white max-h-[calc(100vh-7rem)] flex-col overflow-hidden rounded-[28px]')}
     >
-      <header className="flex items-center gap-3 bg-slate-900 px-4 py-3.5 text-white">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/15 text-[13px] font-semibold ring-1 ring-white/20">
-          {client ? initials(client.name) : <ChatIcon className="h-5 w-5" />}
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-[11px] font-medium uppercase tracking-wider text-slate-300">Ask about</span>
+      <header className="flex items-center gap-3 border-b border-slate-100 py-2 pl-2 pr-3">
+        <InkDot />
+        <span className="flex min-w-0 flex-1 items-center gap-1.5">
+          <span className="shrink-0 text-[14px] text-slate-500">Ask about</span>
           <ClientPicker clients={clients} value={clientId} onChange={setClientId} />
         </span>
         <button
           onClick={() => setOpen(false)}
           aria-label="Minimize chat"
           title="Minimize"
-          className="grid h-8 w-8 shrink-0 place-items-center self-start rounded-full text-slate-300 transition hover:bg-white/15 hover:text-white"
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
         >
           <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
             <path d="M5 10h10" strokeLinecap="round" />
@@ -151,11 +147,10 @@ export function ChatWidget({ userId, clients, currentClientId, open, onOpenChang
         </button>
       </header>
 
-      <div ref={scroller} className="flex-1 space-y-4 overflow-y-auto bg-slate-50/60 px-4 py-4">
+      <div ref={scroller} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
         {pending && (
           <div className="flex justify-end">
-            <p className="max-w-[85%] rounded-2xl rounded-br-md bg-slate-900 px-3.5 py-2 text-[13.5px] leading-snug text-white">
-              {pending}
+            <p className={USER_BUBBLE}>{pending}
             </p>
           </div>
         )}
@@ -203,8 +198,7 @@ export function ChatWidget({ userId, clients, currentClientId, open, onOpenChang
         {turns.map((t) => (
           <div key={t.id} className="space-y-2">
             <div className="flex justify-end">
-              <p className="max-w-[85%] rounded-2xl rounded-br-md bg-slate-900 px-3.5 py-2 text-[13.5px] leading-snug text-white">
-                {t.question}
+              <p className={USER_BUBBLE}>{t.question}
               </p>
             </div>
             <Answer turn={t} onCite={onCite} />
@@ -226,7 +220,7 @@ export function ChatWidget({ userId, clients, currentClientId, open, onOpenChang
           e.preventDefault()
           ask(text)
         }}
-        className="flex items-center gap-2 border-t border-slate-100 bg-white px-3 py-3"
+        className="m-2.5 flex items-center gap-2 rounded-full border border-slate-200 bg-white py-1.5 pl-5 pr-1.5 transition focus-within:border-slate-400"
       >
         <input
           ref={input}
@@ -234,13 +228,13 @@ export function ChatWidget({ userId, clients, currentClientId, open, onOpenChang
           onChange={(e) => setText(e.target.value)}
           placeholder={client ? 'Ask a question' : 'Ask a question, e.g. what is overdue for Northwind?'}
           aria-label="Your question"
-          className="h-10 flex-1 rounded-xl bg-slate-100/80 px-3.5 text-[14px] text-slate-800 outline-none ring-1 ring-transparent transition placeholder:text-slate-400 focus:bg-white focus:ring-indigo-300 disabled:opacity-60"
+          className="h-9 min-w-0 flex-1 bg-transparent text-[14px] text-slate-800 outline-none placeholder:text-slate-400"
         />
         <button
           type="submit"
           disabled={!text.trim() || busy}
           aria-label="Send"
-          className="grid h-10 w-10 place-items-center rounded-xl bg-slate-900 text-white transition hover:bg-slate-800 disabled:opacity-40"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-900 text-white transition hover:bg-slate-800 disabled:opacity-40"
         >
           <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <path d="M4 10h11m-4.5-4.5L15 10l-4.5 4.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -253,11 +247,11 @@ export function ChatWidget({ userId, clients, currentClientId, open, onOpenChang
 
 function Answer({ turn: t, onCite }: { turn: Turn; onCite: (c: Citation) => void }) {
   if (t.error) {
-    return <p className="max-w-[92%] rounded-2xl rounded-bl-md bg-rose-50 px-3.5 py-2.5 text-[13px] text-rose-700">{t.error}</p>
+    return <p className="max-w-[92%] rounded-[20px] rounded-bl-md bg-rose-50 px-4 py-2.5 text-[13px] text-rose-700">{t.error}</p>
   }
   if (!t.answer) {
     return (
-      <div className="inline-flex items-center gap-2 rounded-2xl rounded-bl-md bg-white px-3.5 py-2.5 text-[12.5px] text-slate-500 ring-1 ring-slate-200/70">
+      <div className="inline-flex items-center gap-2 rounded-[20px] rounded-bl-md bg-slate-50 px-4 py-2.5 text-[12.5px] text-slate-500 ring-1 ring-slate-200/70">
         <span className="flex gap-1">
           {[0, 1, 2].map((i) => (
             <span key={i} className="h-1.5 w-1.5 animate-bounce rounded-full bg-indigo-400" style={{ animationDelay: `${i * 120}ms` }} />
@@ -270,7 +264,7 @@ function Answer({ turn: t, onCite }: { turn: Turn; onCite: (c: Citation) => void
   const { claims } = t.answer.section
   const verified = claims.filter((c) => c.status === 'verified').length
   return (
-    <div className="max-w-[92%] space-y-2.5 rounded-2xl rounded-bl-md bg-white px-3.5 py-3 ring-1 ring-slate-200/70">
+    <div className="max-w-[92%] space-y-2.5 rounded-[20px] rounded-bl-md bg-slate-50 px-4 py-3 ring-1 ring-slate-200/70">
       {claims.map((c) => (
         <div key={c.id} className="group/claim">
           <p className="text-[13.5px] leading-relaxed text-slate-700">
@@ -327,7 +321,7 @@ function ClientPicker({
   }, [open])
 
   return (
-    <span ref={ref} className="relative mt-0.5 block">
+    <span ref={ref} className="relative block min-w-0">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -335,10 +329,10 @@ function ClientPicker({
         aria-expanded={open}
         aria-label="Client"
         title="Switch client"
-        className="inline-flex max-w-full items-center gap-1.5 rounded-lg bg-white/10 py-0.5 pl-2 pr-1.5 text-left transition hover:bg-white/20"
+        className="inline-flex max-w-full items-center gap-1.5 rounded-full py-1 pl-2.5 pr-2 text-left transition hover:bg-slate-100"
       >
-        <span className="truncate text-[16px] font-semibold leading-tight">{current ? current.name : 'Choose a client'}</span>
-        <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 shrink-0 text-slate-300" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+        <span className="truncate text-[14px] font-semibold leading-tight text-slate-900">{current ? current.name : 'Choose a client'}</span>
+        <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
           <path d="M6.5 7.5 10 4l3.5 3.5M6.5 12.5 10 16l3.5-3.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
@@ -393,6 +387,20 @@ function initials(name: string): string {
 
 function shortName(name: string): string {
   return name.replace(/ (Inc\.|plc|LLC)$/, '')
+}
+
+/** The bar and the open panel share one surface: white, hairline border, soft warm shadow. */
+const SURFACE =
+  'fixed bottom-5 left-1/2 z-30 w-[min(560px,calc(100vw-48px))] -translate-x-1/2 border border-slate-200 shadow-[0_12px_32px_-12px_rgba(26,24,20,0.35)]'
+
+const USER_BUBBLE = 'max-w-[85%] rounded-[20px] rounded-br-md bg-slate-900 px-4 py-2 text-[13.5px] leading-snug text-white'
+
+function InkDot() {
+  return (
+    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-900 text-white">
+      <ChatIcon className="h-4.5 w-4.5" />
+    </span>
+  )
 }
 
 function ChatIcon({ className }: { className: string }) {
