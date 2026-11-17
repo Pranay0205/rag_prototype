@@ -324,13 +324,6 @@ function Facilities({ data, onOpenClient }: { data: HomeData; onOpenClient: (cli
                       <div className="absolute inset-y-0 left-0 rounded-md bg-amber-50" style={{ width: `${twelve}%` }} />
                       <div className="absolute inset-x-0 top-[13px] h-0.5 bg-slate-200" />
                       <div className={cn('grow-x absolute left-0 top-[11px] h-1.5 rounded-full', tone.solid)} style={{ width: `${pos}%` }} />
-                      <div
-                        className={cn(
-                          'absolute top-[7px] -ml-[7px] h-3.5 w-3.5 rounded-full border-[3px] bg-white',
-                          f.matures_within_12m ? 'border-amber-700' : 'border-slate-600',
-                        )}
-                        style={{ left: `${pos}%` }}
-                      />
                     </div>
                   </td>
                   <td className="whitespace-nowrap py-4 text-right">
