@@ -151,10 +151,16 @@ def test_API_11_briefing_saved_with_reviews_and_owner_only(client):
     assert (
         client.post(
             f"/api/briefings/{briefing_id}/claims/{claim_id}/review",
-            json={"user_id": "alex", "decision": "reject"},
+            json={"user_id": "alex", "decision": "reject", "note": "outdated"},
         ).status_code
         == 200
     )
+    other = client.get(f"/api/briefings/{briefing_id}", params={"user_id": "alex"}).json()["sections"][1]
+    for decision in ("accept", "clear"):  # an undone review leaves no decision behind
+        client.post(
+            f"/api/briefings/{briefing_id}/claims/{other['claims'][0]['id']}/review",
+            json={"user_id": "alex", "decision": decision},
+        )
     client.post(
         "/api/actions",
         json={
@@ -170,8 +176,9 @@ def test_API_11_briefing_saved_with_reviews_and_owner_only(client):
     latest = client.get("/api/briefings/latest", params={"user_id": "alex", "client_id": "C-003"}).json()
     assert latest["briefing"]["briefing_id"] == briefing_id and latest["stale"] is False
     assert latest["reviews"] == {claim_id: "reject"} and latest["created_suggestions"] == ["overdue-A-301"]
+    assert latest["review_notes"] == {claim_id: "outdated"}
 
-    # never served to another user: sam has no saved Cascade briefing of his own
+    # never served to another user: sam has no saved Cascade briefing of their own
     assert (
         client.get("/api/briefings/latest", params={"user_id": "sam", "client_id": "C-003"}).status_code
         == 404
@@ -204,3 +211,34 @@ def test_API_12_history_lists_own_versions_newest_first(client):
     # alex covers Helios too, but never sees kim's versions
     alex = client.get("/api/briefings/history", params={"user_id": "alex", "client_id": "C-002"}).json()
     assert not set(ids) & {h["briefing_id"] for h in alex}
+
+
+def test_API_13_search_by_name_or_alias_within_coverage(client):
+    def search(user, q):
+        return client.get("/api/clients/search", params={"user_id": user, "q": q}).json()
+
+    assert [r["client_id"] for r in search("alex", "north")["results"]] == ["C-001"]
+    nwl = search("alex", "NWL")["results"]
+    assert nwl[0]["client_id"] == "C-001" and nwl[0]["matched_alias"] == "NWL"
+    outside = search("kim", "Northwind")  # kim covers Helios only
+    assert outside["results"] == [] and "outside your coverage" in outside["notice"]
+    assert "Northwind" not in json.dumps(outside)  # the notice never names the client
+
+
+def test_API_14_ask_returns_cited_verified_answer(client):
+    r = client.post("/api/clients/C-001/ask", json={"user_id": "alex", "question": "Who is the new CFO?"})
+    assert r.status_code == 200
+    claim = r.json()["section"]["claims"][0]
+    assert claim["citations"] and claim["status"] in ("verified", "unverified")
+    blocked = client.post("/api/clients/C-001/ask", json={"user_id": "kim", "question": "Who is the CFO?"})
+    assert blocked.status_code == 403  # coverage enforced before any retrieval
+
+
+def test_API_15_home_respects_coverage(client):
+    kim = client.get("/api/home", params={"user_id": "kim"}).json()
+    assert [c["client_id"] for c in kim["companies"]] == ["C-002"]
+    assert {m["client_id"] for m in kim["meetings"]} == {"C-002"}
+    alex = client.get("/api/home", params={"user_id": "alex"}).json()
+    nw = next(c for c in alex["companies"] if c["client_id"] == "C-001")
+    assert nw["revenue_ttm"] == 3400000 and nw["yoy_pct"] == -18.1
+    assert alex["facilities"][0]["product"] == "Revolving Credit Facility"  # soonest maturity first

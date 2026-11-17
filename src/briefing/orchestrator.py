@@ -30,7 +30,13 @@ from briefing.schemas import (
     Confidence,
     Conflict,
     ConflictValue,
+    ContactRow,
+    CoverageMember,
+    Exhibits,
+    KeyFigure,
     MeetingRef,
+    PipelineRow,
+    RevenueLine,
     Section,
     SectionKey,
     SourceKind,
@@ -258,6 +264,9 @@ class FactSheet:
     profile: dict
     last_interaction: str | None
     actions: list[dict]
+    revenue: dict = field(default_factory=dict)
+    holdings: list[dict] = field(default_factory=list)
+    opportunities: list[dict] = field(default_factory=list)
 
 
 def gather(tools: Tools, viewer: Viewer, client_id: str) -> FactSheet:
@@ -298,7 +307,115 @@ def gather(tools: Tools, viewer: Viewer, client_id: str) -> FactSheet:
         profile=profile.data,
         last_interaction=(interactions.data or {}).get("last_interaction_date"),
         actions=(pipeline.data or {}).get("open_actions", []),
+        revenue=revenue.data or {},
+        holdings=holdings.data or [],
+        opportunities=(pipeline.data or {}).get("opportunities", []),
     )
+
+
+def _money(v: float) -> str:
+    """3400000 -> "$3.4M", 4150000 -> "$4.15M", 150000000 -> "$150M"."""
+    for scale, unit in ((1e9, "B"), (1e6, "M"), (1e3, "K")):
+        if abs(v) >= scale:
+            return f"${v / scale:,.2f}".rstrip("0").rstrip(".") + unit
+    return f"${v:,.0f}"
+
+
+def _date(iso: str) -> str:
+    return datetime.fromisoformat(iso).strftime("%-d %b %Y")
+
+
+_UTILIZATION = re.compile(r"utili[sz]ation\s+(\d+(?:\.\d+)?)%", re.IGNORECASE)
+
+
+def key_figures(facts: FactSheet) -> list[KeyFigure]:
+    """ORC-13: headline cards computed by code from the tools' structured results (P1). Each card
+    cites the rows it was computed from, so it opens in the source drawer like any claim."""
+    cite = {c.source_id: c for group in facts.groups.values() for c in group}
+    out: list[KeyFigure] = []
+
+    total = facts.revenue.get("total") or {}
+    summary = list(facts.groups.get("revenue", []))
+    trend = [q["total"] for q in facts.revenue.get("quarterly", []) if q["total"] is not None]
+    if total.get("current_ttm") is not None:
+        yoy = total.get("yoy_pct")
+        out.append(
+            KeyFigure(
+                key="revenue",
+                label="Relationship revenue (TTM)",
+                value=_money(total["current_ttm"]),
+                detail=(
+                    f"{yoy:+.1f}% vs {_money(total['prior_ttm'])} prior"
+                    if yoy is not None
+                    else "No prior period"
+                ),
+                tone="neutral" if yoy is None else ("good" if yoy >= 0 else "bad"),
+                trend=trend,
+                citations=summary,
+            )
+        )
+    elif total:
+        missing = ", ".join(facts.revenue.get("missing_quarters", [])) or "a quarter"
+        out.append(
+            KeyFigure(
+                key="revenue",
+                label="Relationship revenue (TTM)",
+                value="Incomplete",
+                detail=f"{missing} not reported",
+                tone="warn",
+                trend=trend,
+                citations=summary,
+            )
+        )
+
+    facilities = [h for h in facts.holdings if h.get("notional_usd")]
+    if facilities:
+        h = max(facilities, key=lambda x: x["notional_usd"])
+        used = _UTILIZATION.search(h.get("notes") or "")
+        soon = h.get("matures_within_12m")
+        detail = f"Matures {_date(h['maturity_date'])}" if h.get("maturity_date") else h["status"]
+        out.append(
+            KeyFigure(
+                key="facility",
+                label=h["product"],
+                value=_money(h["notional_usd"]),
+                detail=detail,  # utilization is shown as the bar
+                tone="warn" if soon else "neutral",
+                bar_pct=float(used.group(1)) if used else None,
+                citations=[c for c in [cite.get(f"sql:holdings/{h['holding_id']}")] if c],
+            )
+        )
+
+    if facts.opportunities:
+        opps = facts.opportunities
+        stalled = sum(o["stage"] == "stalled" for o in opps)
+        out.append(
+            KeyFigure(
+                key="pipeline",
+                label="Open pipeline",
+                value=_money(sum(o["est_revenue_usd"] or 0 for o in opps)),
+                detail=f"{len(opps)} {'opportunity' if len(opps) == 1 else 'opportunities'}"
+                + (f" · {stalled} stalled" if stalled else ""),
+                tone="warn" if stalled else "neutral",
+                citations=[c for o in opps if (c := cite.get(f"sql:opportunities/{o['opp_id']}"))],
+            )
+        )
+
+    open_actions = [a for a in facts.actions if a["status"] == "open"]
+    overdue = [a for a in open_actions if a["overdue"]]
+    out.append(
+        KeyFigure(
+            key="actions",
+            label="Open actions",
+            value=str(len(open_actions)),
+            detail=f"{len(overdue)} overdue" if overdue else "None overdue",
+            tone="bad" if overdue else "good",
+            citations=[
+                c for a in (overdue or open_actions) if (c := cite.get(f"sql:open_actions/{a['action_id']}"))
+            ],
+        )
+    )
+    return out
 
 
 def build_evidence(
@@ -341,8 +458,8 @@ def build_evidence(
                     ("STALE", chunk["stale"]),
                     ("INFERRED-LINK", chunk["link_method"] == "inferred"),
                     ("SUSPECTED-INJECTION", chunk["suspected_injection"]),
-                    ("CONFIDENTIAL", chunk["classification"] == "confidential"),
-                    ("RESTRICTED", chunk["classification"] == "restricted"),
+                    # No classification labels: access is enforced in code before retrieval (P3), and
+                    # measured in eval, a RESTRICTED label made the model withhold entitled content.
                 )
                 if on
             ]
@@ -376,7 +493,7 @@ def _annotate(raw: str, ids: list[str], has_inline: bool) -> tuple[str, str]:
     wrote no inline markers, all citations are appended at the end of the claim.
     """
     number = {eid: n for n, eid in enumerate(ids, start=1)}
-    clean = _clean(re.sub(r"\s+([.,;:])", r"\1", _MARKER.sub("", raw)))
+    clean = _plain(raw)
     if has_inline:
         annotated = _MARKER.sub(
             lambda m: " " + "".join(f"[{number[i.strip()]}]" for i in m.group(1).split(",")), raw
@@ -389,6 +506,76 @@ def _annotate(raw: str, ids: list[str], has_inline: bool) -> tuple[str, str]:
 
 def _clean(text: str) -> str:
     return text.replace("—", " - ").replace("–", "-").strip()  # house rule: no em-dashes in UI copy
+
+
+def _plain(text: str) -> str:
+    """Text with evidence markers removed ("... record [E6]." -> "... record."). Evidence IDs are
+    internal to one generation call and must never reach the UI."""
+    return _clean(re.sub(r"\s+([.,;:])", r"\1", _MARKER.sub("", text)))
+
+
+def _conflict_status(ev: Evidence) -> str | None:
+    """ORC-14: which side of a conflict is superseded, decided from the evidence, not the model."""
+    if ev.derived:
+        return "outdated"
+    return "current" if ev.kind == "sql" else None
+
+
+def exhibits(facts: FactSheet, attendees: list[str], viewer_id: str) -> Exhibits:
+    """ORC-14: contacts (with meeting attendance), coverage team, revenue by product line and the
+    pipeline, rendered by the UI as lists and charts. Rows come only from the viewer's tool results,
+    so entitlements already apply."""
+    cite = {c.source_id: c for group in facts.groups.values() for c in group}
+    going = {a.lower() for a in attendees}
+    contacts = [
+        ContactRow(
+            name=k["name"],
+            title=k["title"],
+            status="former" if not k["is_active"] else ("new" if k["changed_recently"] else "current"),
+            attending=k["name"].lower() in going,
+            since=k["start_date"],
+            until=k["end_date"],
+            citation=cite.get(f"sql:contacts/{k['contact_id']}"),
+        )
+        for k in facts.profile.get("contacts", [])
+    ]
+    order = {"new": 0, "current": 1, "former": 2}
+    contacts.sort(key=lambda c: (not c.attending, order[c.status]))
+    # A deal team's membership is itself confidential (it reveals that a deal exists), so it is shown
+    # only to members of that deal team.
+    team = facts.profile.get("coverage_team", [])
+    on_deal_team = any(m["user_id"] == viewer_id and m["coverage_role"] == "deal_team" for m in team)
+    coverage = [
+        CoverageMember(
+            name=m["name"], role=m["coverage_role"].replace("_", " "), primary=bool(m["is_primary"])
+        )
+        for m in team
+        if m["coverage_role"] != "deal_team" or on_deal_team
+    ]
+    lines = [
+        RevenueLine(
+            line=r["product_line"], current=r["current_ttm"], prior=r["prior_ttm"], yoy_pct=r["yoy_pct"]
+        )
+        for r in facts.revenue.get("by_product_line", [])
+    ]
+    pipeline = [
+        PipelineRow(
+            product=o["product"],
+            stage=o["stage"].replace("_", " "),
+            est_revenue=o["est_revenue_usd"],
+            probability=o["probability_pct"],
+            next_step=o["next_step"],
+            citation=cite.get(f"sql:opportunities/{o['opp_id']}"),
+        )
+        for o in facts.opportunities
+    ]
+    return Exhibits(
+        contacts=contacts,
+        coverage=coverage,
+        revenue_lines=lines,
+        revenue_citation=next(iter(facts.groups.get("revenue", [])), None),
+        pipeline=pipeline,
+    )
 
 
 def run_section(
@@ -503,14 +690,19 @@ def run_section(
         if len({v.cite for v in vals}) >= 2:  # a conflict needs two distinct cited sources
             conflicts.append(
                 Conflict(
-                    topic=_clean(dc.topic),
-                    resolution=_clean(dc.resolution),
+                    topic=_plain(dc.topic),
+                    resolution=_plain(dc.resolution),
                     values=[
-                        ConflictValue(value=_clean(v.value), citation=by_id[v.cite].citation) for v in vals
+                        ConflictValue(
+                            value=_plain(v.value),
+                            citation=by_id[v.cite].citation,
+                            status=_conflict_status(by_id[v.cite]),
+                        )
+                        for v in vals
                     ],
                 )
             )
-    unknowns = [Unknown(question=_clean(u.question), reason=_clean(u.reason)) for u in draft.unknowns]
+    unknowns = [Unknown(question=_plain(u.question), reason=_plain(u.reason)) for u in draft.unknowns]
     follow_ups = [
         SuggestedAction(
             id=f"fu-{spec.key.value}-{i + 1}",
@@ -617,19 +809,8 @@ def deterministic_actions(
 EventSink = Callable[[str, dict], None]
 
 
-def run_briefing(
-    tools: Tools,
-    user_id: str,
-    client_id: str,
-    on_event: EventSink | None = None,
-    briefing_id: str | None = None,
-) -> Briefing:
-    started = time.time()
-    usage_before = dict(llm.usage)
-    viewer = tools.viewer(user_id)
-    if viewer is None:
-        raise BriefingError("NOT_FOUND", f"No user {user_id}")
-    facts = gather(tools, viewer, client_id)  # raises on NOT_FOUND / NOT_IN_COVERAGE (ORC-1)
+def _context(tools: Tools, viewer: Viewer, facts: FactSheet) -> tuple[dict, dict | None]:
+    """Prompt context shared by briefing sections and questions, plus the next meeting."""
     client = facts.profile["client"]
     meetings = tools.get_meetings(viewer, client["client_id"]).data
     meeting = meetings[0] if meetings else None
@@ -647,6 +828,76 @@ def run_briefing(
         "last_interaction": facts.last_interaction or "none logged",
         "data_gaps": "; ".join(facts.warnings) or "none",
     }
+    return context, meeting
+
+
+ASK_GUIDANCE = (
+    "Answer the banker's question directly in 1 to 4 claims. If the evidence does not answer it, "
+    "add an unknown saying what is missing instead of writing a claim."
+)
+
+
+def answer_question(tools: Tools, user_id: str, client_id: str, question: str) -> dict:
+    """ORC-15: one free-form question about one client, answered by the same pipeline as a briefing
+    section: entitlement-filtered retrieval, cited claims, the same verification. The question steers
+    retrieval; it can never widen what is retrieved (P3), and it is never trusted as evidence."""
+    started = time.time()
+    viewer = tools.viewer(user_id)
+    if viewer is None:
+        raise BriefingError("NOT_FOUND", f"No user {user_id}")
+    question = " ".join(question.split())[:500]
+    if not question:
+        raise BriefingError("INVALID_INPUT", "Ask a question")
+    facts = gather(tools, viewer, client_id)  # coverage enforced here (ORC-1)
+    context, _ = _context(tools, viewer, facts)
+    spec = SectionSpec(
+        SectionKey.ASK, "Answer", question, ASK_GUIDANCE, tuple(facts.groups), (), (question,), k=12
+    )
+    evidence, limited, dropped, warnings = build_evidence(tools, viewer, client_id, spec, facts)
+    section, conflicts, unknowns, _, trace = run_section(spec, evidence, context)
+    section.warnings += warnings
+    trace["dropped_for_budget"] = dropped
+    ask_id = f"ask-{facts.profile['client']['client_id']}-{uuid.uuid4().hex[:8]}"
+    runs = config.VAR_DIR / "runs"
+    runs.mkdir(parents=True, exist_ok=True)
+    log = {
+        "ask_id": ask_id,
+        "viewer": user_id,
+        "question": question,
+        "seconds": round(time.time() - started, 1),
+    }
+    (runs / f"{ask_id}.json").write_text(json.dumps({**log, "trace": trace}, indent=2, default=str))  # ORC-11
+    return {
+        "ask_id": ask_id,
+        "question": question,
+        "section": section,
+        "conflicts": conflicts,
+        "unknowns": unknowns,
+        "access_limited": limited or facts.access_limited,
+    }
+
+
+def run_briefing(
+    tools: Tools,
+    user_id: str,
+    client_id: str,
+    on_event: EventSink | None = None,
+    briefing_id: str | None = None,
+) -> Briefing:
+    started = time.time()
+    usage_before = dict(llm.usage)
+    viewer = tools.viewer(user_id)
+    if viewer is None:
+        raise BriefingError("NOT_FOUND", f"No user {user_id}")
+    facts = gather(tools, viewer, client_id)  # raises on NOT_FOUND / NOT_IN_COVERAGE (ORC-1)
+    figures = key_figures(facts)
+    if on_event:  # ORC-13: cards render instantly, before any model call
+        on_event("figures", [f.model_dump(mode="json") for f in figures])
+    client = facts.profile["client"]
+    context, meeting = _context(tools, viewer, facts)
+    views = exhibits(facts, meeting["client_attendees"] if meeting else [], viewer.user_id)
+    if on_event:  # ORC-14: lists and charts render before any model call, like the key figures
+        on_event("exhibits", views.model_dump(mode="json"))
 
     sections: dict[SectionKey, Section] = {}
     conflicts: list[Conflict] = []
@@ -714,6 +965,8 @@ def run_briefing(
         conflicts=conflicts,
         unknowns=unknowns,
         suggested_actions=actions,
+        key_figures=figures,
+        exhibits=views,
         access_limited=access_limited,
     )
 

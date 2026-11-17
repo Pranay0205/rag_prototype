@@ -288,10 +288,12 @@ def latest_briefing(user_id: str, client_id: str, briefing_id: str | None = None
     else:
         raise HTTPException(404, {"code": "NOT_FOUND", "message": "No saved briefing"})
     conn = app_db()
-    reviews = {
-        x["claim_id"]: x["decision"]
-        for x in rows(conn, "SELECT * FROM claim_reviews WHERE briefing_id=? ORDER BY at", (b.briefing_id,))
-    }
+    reviews, review_notes = {}, {}
+    for x in rows(conn, "SELECT * FROM claim_reviews WHERE briefing_id=? ORDER BY at", (b.briefing_id,)):
+        reviews[x["claim_id"]] = x["decision"]  # the latest decision wins
+        review_notes[x["claim_id"]] = x["note"] or ""
+        if x["decision"] == "clear":
+            del reviews[x["claim_id"]], review_notes[x["claim_id"]]
     created = [
         x["suggestion_id"]
         for x in rows(conn, "SELECT suggestion_id FROM created_actions WHERE briefing_id=?", (b.briefing_id,))
@@ -302,6 +304,7 @@ def latest_briefing(user_id: str, client_id: str, briefing_id: str | None = None
         "created_at": r["created_at"],
         "stale": r["data_built_at"] != data_built_at(),
         "reviews": reviews,
+        "review_notes": review_notes,
         "created_suggestions": created,
     }
 
@@ -366,8 +369,8 @@ def source(source_id: str, user_id: str):
 
 class Review(BaseModel):
     user_id: str
-    decision: Literal["accept", "reject"]
-    note: str = ""
+    decision: Literal["accept", "reject", "clear"]  # clear = undo; rows are appended, never edited
+    note: str = ""  # reject reason: wrong | outdated | not_relevant (feeds EVAL-11)
 
 
 @app.post("/api/briefings/{briefing_id}/claims/{claim_id}/review")
@@ -459,6 +462,94 @@ def extract_commitments(client_id: str, n: Notes):
         }  # quote must exist in notes
         for c in result.items
     ]
+
+
+# ---------------------------------------------------------------- API-13 search, API-14 ask, API-15 home
+
+
+@app.get("/api/clients/search")
+def search_clients(user_id: str, q: str = ""):
+    """API-13: company search for the top bar, within the viewer's coverage (TOOL-14)."""
+    t = tools()
+    r = t.search_clients(viewer_or_404(t, user_id), q)
+    raise_for(r)
+    return {"results": r.data, "notice": r.warnings[0] if r.warnings else None}
+
+
+class Ask(BaseModel):
+    user_id: str
+    question: str
+
+
+@app.post("/api/clients/{client_id}/ask")
+def ask(client_id: str, a: Ask):
+    """API-14: a free-form question answered with cited, verified claims (ORC-15)."""
+    t = tools()
+    try:
+        return orchestrator.answer_question(t, a.user_id, client_id, a.question)
+    except orchestrator.BriefingError as e:
+        raise HTTPException(HTTP_STATUS.get(e.code, 400), {"code": e.code, "message": str(e)}) from e
+    except llm.LLMError as e:
+        raise HTTPException(503, {"code": "UNAVAILABLE", "message": str(e)}) from e
+
+
+@app.get("/api/home")
+def home(user_id: str):
+    """API-15: the signed-in dashboard: upcoming meetings, covered companies with headline revenue,
+    and facilities with their maturities. Every value comes from the tools, so coverage and
+    entitlements apply exactly as in a briefing."""
+    t = tools()
+    viewer = viewer_or_404(t, user_id)
+    meetings = t.get_meetings(viewer).data
+    saved = {}
+    with app_db() as conn:
+        for r in rows(
+            conn,
+            "SELECT client_id, MAX(created_at) AS at FROM briefings WHERE user_id=? GROUP BY client_id",
+            (user_id,),
+        ):
+            saved[r["client_id"]] = r["at"]
+    companies, facilities = [], []
+    for cid in sorted(t._covered(viewer)):
+        profile = t.get_client_profile(viewer, cid)
+        if not profile.ok:
+            continue
+        p = profile.data
+        total = (t.get_revenue(viewer, cid).data or {}).get("total", {})
+        role = next((m["coverage_role"] for m in p["coverage_team"] if m["user_id"] == user_id), None)
+        companies.append(
+            {
+                "client_id": cid,
+                "name": p["client"]["legal_name"],
+                "industry": p["client"]["industry"],
+                "aliases": p["aliases"],
+                "role": role.replace("_", " ") if role else None,
+                "revenue_ttm": total.get("current_ttm"),
+                "yoy_pct": total.get("yoy_pct"),
+                "next_meeting_id": next((m["meeting_id"] for m in meetings if m["client_id"] == cid), None),
+                "last_prepared": saved.get(cid),
+            }
+        )
+        for h in t.get_holdings(viewer, cid).data or []:
+            if h["notional_usd"]:
+                facilities.append(
+                    {
+                        "client_id": cid,
+                        "client": p["client"]["legal_name"],
+                        "product": h["product"],
+                        "notional_usd": h["notional_usd"],
+                        "maturity_date": h["maturity_date"],
+                        "matures_within_12m": h["matures_within_12m"],
+                        "notes": h["notes"],
+                    }
+                )
+    facilities.sort(key=lambda f: f["maturity_date"] or "9999")
+    return {
+        "today": config.TODAY.isoformat(),
+        "meetings": [{**m, "last_prepared": saved.get(m["client_id"])} for m in meetings],
+        "companies": companies,
+        "facilities": facilities,
+    }
 
 
 # ---------------------------------------------------------------- API-10

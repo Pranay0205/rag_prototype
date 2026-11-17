@@ -108,6 +108,12 @@ def test_TOOL_5_contact_change_visible(tools, alex):
     assert contacts["Dana Whitfield"]["is_active"] == 0 and contacts["Dana Whitfield"]["changed_recently"]
 
 
+def test_TOOL_5_sql_sources_carry_their_row(tools, alex):
+    sources = {c.source_id: c for c in tools.get_client_profile(alex, "C-001").sources}
+    dana = next(c for c in sources.values() if c.title == "Contact: Dana Whitfield")
+    assert dana.record["end_date"] == "2026-08-31" and dana.record["is_active"] == 0
+
+
 def test_TOOL_5_merged_id_accepted(tools, alex):
     r = tools.get_client_profile(alex, "C-007")
     assert r.ok and r.data["client"]["client_id"] == "C-002" and r.data["merged_ids"] == ["C-007"]

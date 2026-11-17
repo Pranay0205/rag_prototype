@@ -249,3 +249,78 @@ def test_ORC_5_missing_markers_appended_and_unknown_marker_dropped(monkeypatch):
     monkeypatch.setattr(llm, "chat_json", fake_llm(draft))
     claims = run_section(METRICS, evidence(), CONTEXT)[0].claims
     assert [c.annotated for c in claims] == ["Revenue fell 18.1% [1]."]
+
+
+def test_ORC_5_evidence_ids_never_reach_conflicts_or_unknowns(monkeypatch):
+    draft = {
+        "conflicts": [{
+            "topic": "Revenue [E1]",
+            "values": [{"value": "$3.4M [E1]", "cite": "E1"}, {"value": "$4.1M", "cite": "E2"}],
+            "resolution": "Use the system figure [E1][E2].",
+        }],
+        "unknowns": [{"question": "Q3 revenue [E1]?", "reason": "no data [E1, E2]"}],
+    }  # fmt: skip
+    monkeypatch.setattr(llm, "chat_json", fake_llm(draft))
+    _, conflicts, unknowns, *_ = run_section(METRICS, evidence(), CONTEXT)
+    c = conflicts[0]
+    assert (c.topic, c.resolution, c.values[0].value) == ("Revenue", "Use the system figure.", "$3.4M")
+    assert (unknowns[0].question, unknowns[0].reason) == ("Q3 revenue?", "no data")
+
+
+def test_ORC_13_key_figures_computed_from_sql(tools):
+    figures = {
+        f.key: f for f in orchestrator.key_figures(orchestrator.gather(tools, tools.viewer("alex"), "C-001"))
+    }
+    revenue, facility, actions = figures["revenue"], figures["facility"], figures["actions"]
+    assert (revenue.value, revenue.detail, revenue.tone) == ("$3.4M", "-18.1% vs $4.15M prior", "bad")
+    assert revenue.citations[0].source_id == "sql:revenue/C-001/summary" and len(revenue.trend) == 8
+    assert (facility.value, facility.bar_pct, facility.tone) == (
+        "$150M",
+        62.0,
+        "warn",
+    )  # matures in 12 months
+    assert (actions.value, actions.detail) == ("3", "2 overdue")
+
+
+def test_ORC_13_key_figures_respect_entitlements(tools):
+    def pipeline(user):
+        figures = orchestrator.key_figures(orchestrator.gather(tools, tools.viewer(user), "C-002"))
+        return next(f for f in figures if f.key == "pipeline")
+
+    kim, sam = pipeline("kim"), pipeline("sam")
+    assert kim.value == "$4.7M" and len(kim.citations) == 2  # includes the restricted Aurora mandate
+    assert sam.value == "$1.2M" and len(sam.citations) == 1  # never counted for a viewer without access
+
+
+def test_ORC_14_exhibits_from_sql(tools):
+    facts = orchestrator.gather(tools, tools.viewer("alex"), "C-001")
+    views = orchestrator.exhibits(facts, ["Raj Menon", "Lucia Ferrante"], "alex")
+    contacts = {c.name: (c.status, c.attending) for c in views.contacts}
+    assert contacts["Raj Menon"] == ("new", True) and contacts["Dana Whitfield"] == ("former", False)
+    assert views.contacts[0].name == "Raj Menon"  # attending and new first
+    fx = next(r for r in views.revenue_lines if r.line == "FX")
+    assert (fx.current, fx.prior, fx.yoy_pct) == (900000, 1600000, -43.8)
+    assert [p.stage for p in views.pipeline] == ["proposal pending", "identified"]
+
+
+def test_ORC_14_deal_team_and_restricted_pipeline_hidden_from_others(tools):
+    def views(user):
+        return orchestrator.exhibits(orchestrator.gather(tools, tools.viewer(user), "C-002"), [], user)
+
+    for user in ("sam", "alex"):  # neither is on the Aurora deal team
+        v = views(user)
+        assert "Kim Laurent" not in {m.name for m in v.coverage}
+        assert all("Aurora" not in p.product for p in v.pipeline)
+    kim = views("kim")
+    assert "Kim Laurent" in {m.name for m in kim.coverage} and any(
+        "Aurora" in p.product for p in kim.pipeline
+    )
+
+
+def test_ORC_14_conflict_side_from_evidence_not_model(monkeypatch):
+    draft = {"conflicts": [{"topic": "Revenue", "values": [
+        {"value": "$3.4M", "cite": "E1"}, {"value": "$4.1M", "cite": "E2"},
+    ], "resolution": "Use the system figure."}]}  # fmt: skip
+    monkeypatch.setattr(llm, "chat_json", fake_llm(draft))
+    _, conflicts, *_ = run_section(METRICS, evidence(), CONTEXT)
+    assert [v.status for v in conflicts[0].values] == ["current", None]

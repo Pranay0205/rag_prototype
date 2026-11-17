@@ -8,6 +8,7 @@ become Unknowns.
 from datetime import date, datetime
 from datetime import date as Date  # alias: a field named `date` would shadow the type
 from enum import StrEnum
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -22,6 +23,7 @@ class SectionKey(StrEnum):
     OPPORTUNITIES = "opportunities"  # What to discuss, with supporting evidence
     NEWS = "news_events"  # Approved recent news that should shape the conversation
     UNCERTAINTY = "uncertainty"  # What is uncertain, conflicting or unavailable
+    ASK = "ask"  # ORC-15: a free-form question, not a briefing section
 
 
 class SourceKind(StrEnum):
@@ -50,6 +52,9 @@ class Citation(BaseModel):
     # The exact span inside `snippet` that supports the claim. Located by code (verify.locate_quote),
     # never taken on trust from the model; None when it could not be found.
     quote: str | None = None
+    # Structured sources only: the database row behind `snippet`, shown as a record in the UI so a
+    # system-of-record value is never mistaken for a document sentence. Never sent to the model.
+    record: dict[str, Any] | None = None
 
 
 class Claim(BaseModel):
@@ -72,6 +77,9 @@ class Section(BaseModel):
 class ConflictValue(BaseModel):
     value: str
     citation: Citation
+    # Set by code from the evidence, never by the model: a prior briefing is "outdated",
+    # a system-of-record row is "current"; None for other documents.
+    status: Literal["outdated", "current"] | None = None
 
 
 class Conflict(BaseModel):
@@ -83,6 +91,61 @@ class Conflict(BaseModel):
 class Unknown(BaseModel):
     question: str  # what the analyst might expect to know
     reason: str  # "no data", "restricted at your access level", "stale (>12 months)"
+
+
+class KeyFigure(BaseModel):
+    """ORC-13: a headline number computed by code from structured data. Never written by the model."""
+
+    key: str  # "revenue" | "facility" | "pipeline" | "actions"
+    label: str
+    value: str
+    detail: str
+    tone: Literal["good", "bad", "warn", "neutral"] = "neutral"
+    trend: list[float] = []  # sparkline points, oldest first
+    bar_pct: float | None = None  # e.g. facility utilization
+    citations: list[Citation] = []
+
+
+class ContactRow(BaseModel):
+    name: str
+    title: str
+    status: Literal["new", "current", "former"]  # new = joined since the recent-change cut-off
+    attending: bool  # on the client side of the upcoming meeting
+    since: str | None = None
+    until: str | None = None
+    citation: Citation | None = None
+
+
+class RevenueLine(BaseModel):
+    line: str
+    current: float | None
+    prior: float | None
+    yoy_pct: float | None
+
+
+class PipelineRow(BaseModel):
+    product: str
+    stage: str
+    est_revenue: float | None
+    probability: int | None
+    next_step: str | None
+    citation: Citation | None = None
+
+
+class CoverageMember(BaseModel):
+    name: str
+    role: str
+    primary: bool
+
+
+class Exhibits(BaseModel):
+    """ORC-14: structured views of the briefing's answers, built by code from tool results (P1)."""
+
+    contacts: list[ContactRow] = []
+    coverage: list[CoverageMember] = []
+    revenue_lines: list[RevenueLine] = []
+    revenue_citation: Citation | None = None
+    pipeline: list[PipelineRow] = []
 
 
 class SuggestedAction(BaseModel):
@@ -124,6 +187,8 @@ class Briefing(BaseModel):
     conflicts: list[Conflict] = []
     unknowns: list[Unknown] = []
     suggested_actions: list[SuggestedAction] = []
+    key_figures: list[KeyFigure] = []
+    exhibits: Exhibits = Exhibits()
     # Deliberately a boolean, not a count: a count of hidden records would itself leak
     # information about restricted activity.
     access_limited: bool = False

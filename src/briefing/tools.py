@@ -45,13 +45,16 @@ def _fail(code: ErrorCode, message: str, candidates: list[str] | None = None) ->
     return ToolResult(ok=False, error=ToolError(code=code, message=message, candidates=candidates or []))
 
 
-def _sql_source(source_id: str, title: str, snippet: str, on: str | None = None) -> Citation:
+def _sql_source(
+    source_id: str, title: str, snippet: str, on: str | None = None, record: dict | None = None
+) -> Citation:
     return Citation(
         source_id=f"sql:{source_id}",
         kind=SourceKind.SQL,
         title=title,
         date=date.fromisoformat(on) if on else None,
         snippet=snippet,
+        record=record,
     )
 
 
@@ -191,6 +194,53 @@ class Tools:
             )
         return ToolResult(ok=True, data=ms)
 
+    # ------------------------------------------------------------ TOOL-14
+
+    def search_clients(self, viewer: Viewer, query: str) -> ToolResult:
+        """TOOL-14: search-as-you-type over the viewer's coverage, by legal name or alias. When
+        nothing in coverage matches, falls back to TOOL-4 (fuzzy and alias resolution), which says
+        a match is outside coverage without naming it. Not wrapped in @tool: its argument is free
+        text, not a client_id, and coverage is applied to every result below."""
+        q = " ".join(query.split()).lower()
+        if not q:
+            return ToolResult(ok=True, data=[])
+        covered = self._covered(viewer)
+        clients = rows(self.conn, "SELECT client_id, legal_name FROM clients ORDER BY legal_name")
+        aliases = rows(self.conn, "SELECT alias, client_id FROM client_aliases")
+        out = []
+        for c in clients:
+            if c["client_id"] not in covered:
+                continue
+            via = None
+            if q not in c["legal_name"].lower():
+                via = next(
+                    (
+                        a["alias"]
+                        for a in aliases
+                        if a["client_id"] == c["client_id"] and q in a["alias"].lower()
+                    ),
+                    None,
+                )
+                if via is None:
+                    continue
+            out.append({"client_id": c["client_id"], "name": c["legal_name"], "matched_alias": via})
+        if out:
+            return ToolResult(ok=True, data=out)
+        resolved = self.resolve_client(viewer, query)
+        if resolved.ok:
+            return ToolResult(
+                ok=True,
+                data=[
+                    {"client_id": r["client_id"], "name": r["name"], "matched_alias": query}
+                    for r in resolved.data
+                ],
+            )
+        if resolved.error.code == "NOT_IN_COVERAGE":
+            return ToolResult(
+                ok=True, data=[], warnings=["A client matches, but it is outside your coverage"]
+            )
+        return ToolResult(ok=True, data=[])
+
     # ------------------------------------------------------------ TOOL-5
 
     @tool
@@ -225,6 +275,7 @@ class Tools:
                 f"{c['legal_name']}; {c['segment']}; {c['industry']}; HQ {c['hq_city']}, {c['hq_country']}; "
                 f"client since {c['created_date']}; LEI {c['lei']}",
                 c["created_date"],
+                record=c,
             )
         ]
         sources += [
@@ -234,6 +285,7 @@ class Tools:
                 f"{k['name']}, {k['title']} ({'active' if k['is_active'] else 'inactive'}); "
                 f"from {k['start_date']}" + (f" to {k['end_date']}" if k["end_date"] else ""),
                 k["end_date"] or k["start_date"],
+                record=k,
             )
             for k in contacts
         ]
@@ -242,6 +294,7 @@ class Tools:
                 f"client_merge/{m['merged_id']}",
                 f"Merged record {m['merged_id']}",
                 f"{m['merged_id']} merged into {cid}: {m['rule']}",
+                record=m,
             )
             for m in merged
         ]
@@ -326,6 +379,7 @@ class Tools:
                 f"Revenue {r['period']} {r['product_line']}",
                 f"{r['period']} {r['product_line']}: {_usd(r['revenue_usd'])}"
                 + (f" (booked under {r['source_client_id']})" if r["source_client_id"] != cid else ""),
+                record=r,
             )
             for r in recs
         ]
@@ -351,6 +405,7 @@ class Tools:
                 + (f", matures {h['maturity_date']}" if h["maturity_date"] else "")
                 + (f". {h['notes']}" if h["notes"] else ""),
                 h["opened_date"],
+                record=h,
             )
             for h in hs
         ]
@@ -369,6 +424,7 @@ class Tools:
                 f"Financials {f['fiscal_period']}",
                 f"{f['fiscal_period']}: company revenue ${f['company_revenue_usd_m']:,.0f}M, EBITDA margin "
                 f"{f['ebitda_margin_pct']}%, net leverage {f['net_leverage_x']}x (source: {f['source']})",
+                record=f,
             )
             for f in fs
         ]
@@ -401,6 +457,7 @@ class Tools:
                 f"{o['probability_pct']}% probability, owner {o['owner']}; next step: {o['next_step']} "
                 f"(updated {o['last_updated']})",
                 o["last_updated"],
+                record=o,
             )
             for o in opps
         ]
@@ -411,6 +468,7 @@ class Tools:
                 f"{i['summary']} (severity {i['severity']}, {i['status']}, opened {i['opened_date']}"
                 + (f", resolved {i['resolved_date']})" if i["resolved_date"] else ")"),
                 i["opened_date"],
+                record=i,
             )
             for i in issues
         ]
@@ -422,6 +480,7 @@ class Tools:
                 + (f", OVERDUE by {a['days_overdue']} days" if a["overdue"] else "")
                 + ")",
                 a["due_date"],
+                record=a,
             )
             for a in actions
         ]
@@ -444,6 +503,7 @@ class Tools:
                 i["subject"],
                 f"{i['date']} {i['type']}: {i['subject']} (with {', '.join(jlist(i['client_attendees']))})",
                 i["date"],
+                record=i,
             )
             for i in its
         ]
