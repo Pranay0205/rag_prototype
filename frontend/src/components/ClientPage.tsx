@@ -1,7 +1,7 @@
 // UI-14 client profile: the relationship as a whole, not one meeting. Opened from Home's client list
 // and facilities. Everything comes from API-18 (typed tools, access applied, no model), and every row
 // opens its source in the drawer.
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useId, useState, type ReactNode } from 'react'
 import { ApiError, api, type ClientOverview } from '../api'
 import type { Citation } from '../types'
 import { money } from './Exhibits'
@@ -15,6 +15,30 @@ interface Props {
   onOpenMeeting: (meetingId: string) => void
   onAsk: (clientId: string) => void
   openRevenue?: boolean // the Home "try" card: show the revenue calculation straight away
+}
+
+// What each card shows, for the info icon beside its title
+const INFO: Record<string, string> = {
+  'Relationship revenue (TTM)':
+    'Revenue Meridian earned from this client over the last four reported quarters, compared with the four before. Calculated from the revenue records; select the card to see the working.',
+  'Products held':
+    'Products and facilities the client holds with Meridian. Credit facilities are those with a committed amount.',
+  'Open pipeline':
+    'Estimated revenue from opportunities not yet won or lost, summed. Only opportunities you are cleared to see are included.',
+  'Open actions': 'Commitments Meridian made to the client that are still open. Overdue means past the agreed due date.',
+  Revenue:
+    'Quarterly relationship revenue over two years. The four highlighted quarters make up the current twelve-month figure; the table shows which product lines drove the change.',
+  'Products & facilities':
+    'Each product the client holds, with its size, maturity and how much is drawn. A facility maturing within 12 months is the next refinancing conversation.',
+  Pipeline: 'Open opportunities with their stage, estimated revenue and probability, and the next step on record.',
+  'Interaction history': 'Calls and meetings logged in the CRM, most recent first.',
+  'Upcoming meetings': 'Scheduled meetings with this client. Select one to open or prepare its briefing.',
+  People:
+    'Client contacts, current and former, and the Meridian team covering the client. Contacts who joined recently are marked New.',
+  'Open actions & service issues':
+    'Open commitments to the client, and problems the client raised with Meridian, with their dates and status.',
+  'Company performance': "The client's own reported results, taken from its filings. These are not Meridian revenue.",
+  Documents: 'Emails, notes, news and prior briefings linked to this client that you are cleared to see, newest first.',
 }
 
 const DOCS_SHOWN = 5 // most recent first; the rest behind "Show all"
@@ -416,7 +440,10 @@ function Panel({ title, note, children }: { title: string; note?: string; childr
   return (
     <section className={cn(CARD, 'px-5 pb-4 pt-4')}>
       <header className="mb-2 flex items-baseline justify-between gap-2">
-        <h2 className="text-[16px] font-semibold">{title}</h2>
+        <h2 className="flex items-center gap-1.5 text-[16px] font-semibold">
+          {title}
+          {INFO[title] && <InfoTip text={INFO[title]} />}
+        </h2>
         {note && <span className="text-[12.5px] text-slate-500">{note}</span>}
       </header>
       {children}
@@ -459,18 +486,56 @@ function Stat({
   onClick?: () => void
 }) {
   return (
-    <button onClick={onClick} disabled={!onClick} className={cn(CARD, 'rounded-xl p-4 text-left transition enabled:hover:border-slate-300')}>
-      <span className="block text-[13px] text-slate-600">{label}</span>
-      <span className="mt-1.5 block text-[26px] font-bold leading-none tracking-tight tabular-nums">{value}</span>
+    <div className="relative">
+      <button onClick={onClick} disabled={!onClick} className={cn(CARD, 'w-full rounded-xl p-4 pr-10 text-left transition enabled:hover:border-slate-300')}>
+        <span className="block text-[13px] text-slate-600">{label}</span>
+        <span className="mt-1.5 block text-[26px] font-bold leading-none tracking-tight tabular-nums">{value}</span>
+        <span
+          className={cn(
+            'mt-2 block text-[13px] font-medium',
+            tone === 'bad' ? 'text-rose-700' : tone === 'good' ? 'text-emerald-700' : tone === 'warn' ? 'text-amber-700' : 'text-slate-600',
+          )}
+        >
+          {note}
+        </span>
+      </button>
+      {INFO[label] && (
+        <span className="absolute right-3 top-3.5">
+          <InfoTip text={INFO[label]} align="right" />
+        </span>
+      )}
+      </div>
+  )
+}
+
+/** An info icon beside a card title; its explanation shows on hover or keyboard focus. */
+function InfoTip({ text, align = 'left' }: { text: string; align?: 'left' | 'right' }) {
+  const id = useId()
+  return (
+    <span className="group/info relative inline-flex">
+      <button
+        type="button"
+        aria-label="About this card"
+        aria-describedby={id}
+        className="grid h-5 w-5 place-items-center rounded-full text-slate-400 transition hover:text-slate-700 focus-visible:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+      >
+        <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+          <circle cx="10" cy="10" r="7.25" />
+          <path d="M10 9v4.5" strokeLinecap="round" />
+          <circle cx="10" cy="6.4" r="0.9" fill="currentColor" stroke="none" />
+        </svg>
+      </button>
       <span
+        id={id}
+        role="tooltip"
         className={cn(
-          'mt-2 block text-[13px] font-medium',
-          tone === 'bad' ? 'text-rose-700' : tone === 'good' ? 'text-emerald-700' : tone === 'warn' ? 'text-amber-700' : 'text-slate-600',
+          'pointer-events-none invisible absolute top-full z-30 mt-2 w-72 rounded-lg bg-slate-900 px-3 py-2 text-[12.5px] font-normal leading-relaxed text-white opacity-0 shadow-lg transition group-focus-within/info:visible group-focus-within/info:opacity-100 group-hover/info:visible group-hover/info:opacity-100',
+          align === 'right' ? 'right-0' : 'left-0',
         )}
       >
-        {note}
+        {text}
       </span>
-    </button>
+    </span>
   )
 }
 
