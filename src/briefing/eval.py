@@ -348,7 +348,8 @@ def citation_validity(conn, tools: Tools, b: Briefing) -> tuple[int, list[str]]:
             ok = ok and can_see(viewer, d[0]["classification"], jlist(d[0]["access_groups"]))
         else:
             table, key = ref.split("/", 1)
-            if table in ("revenue", "financials"):
+            if table in ("revenue", "financials") or key.endswith("/summary"):
+                # computed per client (revenue, holdings summaries): the key starts with the client
                 ok = key.split("/")[0] == b.client.client_id
             elif table in ID_COLUMNS:
                 r = rows(conn, f'SELECT * FROM "{table}" WHERE {ID_COLUMNS[table]}=?', (key,))

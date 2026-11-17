@@ -44,14 +44,15 @@ flowchart LR
 1. **Ingestion** (`ingest.py`, ING-1..11) unifies the data once: merges duplicate clients, resolves
    aliases, links documents that have no client ID, removes duplicate documents, flags stale and
    derived sources, quarantines unapproved news, screens for prompt injection, then chunks and
-   indexes.
-2. **Tools** (`tools.py`, TOOL-1..14) are the only way to read data. Each is a typed function with
+   indexes, then runs quality checks on the result (ING-12).
+2. **Tools** (`tools.py`, TOOL-1..16) are the only way to read data. Each is a typed function with
    fixed, parameterized SQL plus Python logic. Every tool enforces coverage and entitlements before
    returning anything, and returns data together with citable sources.
 3. **The orchestrator** (`orchestrator.py`, ORC-1..15) authorizes, gathers structured facts, retrieves
    documents per section, asks the model to write each of the seven sections in parallel from a
    numbered evidence pack, verifies every claim, and assembles the briefing. Sections stream to the
-   browser as they finish.
+   browser as they finish. Questions across clients go to **agentic search** (`agent.py`, ORC-16),
+   where the model chooses which tools to call and the same verifier checks the answer.
 4. **The UI** shows the answers with inline citations, verification status, conflicts and actions,
    and records the analyst's review.
 
@@ -75,6 +76,15 @@ evaluation that fails the release if it regresses.
 | Unapproved news | A news item without approval | Stored but never indexed | T9 |
 | Missing data | Cascade has no Q3 revenue | Reported as a gap, never estimated | T8 |
 
+**Quality checks at every load** (ING-12). After unification, eleven SQL checks run on the result:
+every record belongs to a known client, one client per LEI, no revenue reported twice by the same
+original record, no negative revenue, one primary banker per client, known owners, sensible date
+order, probabilities in range, plus reported gaps and rows held out on purpose. Each check is a query
+that returns the rows breaking it, shown with its SQL on the Data page. Nothing is fixed or hidden.
+The first version of the revenue check failed on Helios: two Lending rows per quarter. They are both
+real (the green loan was booked under the duplicate record), which is why uniqueness is checked per
+original record (`source_client_id`), not per merged client.
+
 ## 4. Where the LLM is used, and where it is not
 
 The rule (P6): **deterministic wherever the answer can be computed; the model only where language
@@ -94,10 +104,14 @@ has to be read or written.**
 | Suggested actions | Code for overdue items and conflicts; the asks section adds untracked commitments | Overdue is a date comparison |
 | **Extracting commitments from meeting notes** | **LLM**, then a human confirms | Free text to structure; each item must quote the notes |
 | **Evaluation grading** | **A different model** (`deepseek-reasoner`) | A grader that is not the writer does not share its blind spots |
+| **Which tools to call, for a question across clients** | **LLM planner** (fast model), at most 4 turns | Free-form questions need a plan; the tools still enforce access, so a bad plan cannot widen what is seen |
+| Whether a question asks for actions, what an app label means | Code (a pattern, a written glossary) | The model guessed what "Check sources" means and got it wrong |
+| Dropping sentences that only report missing evidence | Code | "No evidence shows a sale" is false for a viewer who simply cannot see the sale |
 
 No text-to-SQL. The model never writes queries: it receives evidence that typed tools have already
 fetched and filtered. This removes a whole class of failure (wrong joins, unfiltered queries, access
-bypass) at the cost of flexibility, which the Ask chat recovers through retrieval instead of SQL.
+bypass) at the cost of flexibility, which the Ask chat recovers through retrieval and agentic search
+recovers by choosing among the same typed tools, never by writing SQL.
 
 ## 5. Retrieval and the evidence pack
 
@@ -133,6 +147,11 @@ Every claim goes through five checks (ORC-6) before it is shown:
 5. **Quote location.** The supporting sentence shown to the user is found in the real source text by
    code. The model's own quote is never displayed.
 
+**Absence is a fact only when a complete list shows it.** Holdings carry a "this is the complete list"
+summary, so "Northwind holds no term loan" is cited and verified. A sentence that only reports what
+the evidence lacks ("no evidence shows a sale") is dropped by code and left as an unknown: records the
+viewer may not see are left out, so absence from the evidence proves nothing.
+
 Claims that pass are tagged **Verified**; the rest stay visible but tagged **Check sources**, so a
 weak claim is never silently promoted or silently hidden. A **completeness backstop** (ORC-12) adds
 pipeline opportunities and open actions that the model left out, rendered straight from the database
@@ -146,9 +165,15 @@ row: the model cannot drop an overdue commitment by choosing not to mention it.
 - **Enforced before retrieval** (P3), inside the tools, so restricted text never reaches the model's
   context. Prompting the model to keep secrets is not a control.
 - **No leaks by implication.** The briefing says only that "some sources are restricted for your
-  profile", never how many. The client-search API reports that a name matches a client outside
-  your coverage without naming it. Deal-team membership is shown only to that deal team, because a deal team on
-  the coverage list reveals that a deal exists.
+  profile", never how many, and the same flag appears whatever the question, so it cannot be used
+  to test guesses. The client-search API reports that a name matches a client outside your coverage
+  without naming it. Deal-team membership is filtered inside the profile tool, because a deal team
+  on the coverage list reveals that a deal exists.
+- **Red-teamed, three leaks closed.** Probing the app as Sam found that the deal team reached the
+  client page's data (hidden on screen, visible in the network tab), that a hidden document answered
+  "forbidden" where a missing one answered "not found", and that the Data page's row counts showed
+  one more opportunity than Sam could see. All three now answer exactly as if the record did not
+  exist. The lesson: filters belong in the tools, not on each screen.
 - **No withholding either.** Measured in the eval: when a document carried a RESTRICTED label, or
   its text said "MNPI, coverage must not be informed", the model withheld it from Kim, who is cleared.
   Access is a code decision in both directions, so classification labels were removed from what the
@@ -169,8 +194,16 @@ The briefing is designed to be read in a minute, not studied:
 - **Conflicts as "was → now"**: "Last briefing said ~$4.1M and growing → System record $3.4M, down
   18.1%". The outdated side stays visible on purpose: the team may still believe it.
 - **Before the meeting**: actions ordered by urgency, overdue items first with a day count.
-- **Ask chat**: opened from the briefing header or Home; any further question goes through the same
-  retrieval and verification as a section, with citations and verification tags in the answer.
+- **Ask chat**: scoped to one client, or to **All my clients**. One-client questions use the same
+  retrieval and verification as a section. Questions asking what to do get actions, each with the
+  cited fact that calls for it. Questions across clients go to agentic search, and the answer shows
+  what was looked at ("Products held: Northwind, Helios, Cascade"). The app's own terms are answered
+  from a written guide.
+- **Client page**: the relationship as a whole (revenue by quarter, products, pipeline, history,
+  people, issues, documents), straight from the database, with a "Data as of" line per source.
+- **Every number shows its working** (TOOL-16): the source drawer's Calculation tab gives the rule,
+  each arithmetic step, the SQL as it ran and the rows used. **The Data page** shows the data model,
+  what unification did and the quality checks.
 - **Readable everywhere**: dates as "15 Oct 2026", amounts as "$3.4M", inline citations as small
   numbers that open the source with the sentence highlighted, or the database row itself.
 
@@ -194,6 +227,8 @@ notes, and nothing is saved until the analyst confirms.
 | Fixed query templates per section | LLM query rewriting | Deterministic, testable retrieval; measured gaps fixed by changing templates or k |
 | OpenAI-compatible gateway (DeepSeek) | A specific SDK | One file to swap for an internally hosted model |
 | Writer and grader are different models | Same model grades its own output | Avoids shared blind spots in the reported numbers |
+| Agentic search only for questions across clients | An agent for every question | One-client questions keep fixed retrieval: faster, deterministic, already measured |
+| Dates and counts computed by code ("within 12 months", "this week", "complete list") | Let the model work them out | The judge has no clock; code facts make such claims verifiable |
 
 ## 11. What the evaluation changed
 
@@ -207,11 +242,15 @@ Several design decisions came from measurements, not from the first draft:
 | The model withheld Project Aurora from the cleared deal-team viewer | Completeness backstop, then removed access labels from the model's input; recall for that case went from 0% to passing |
 | Asking for shorter claims made the model pad them with interpretation, and unverified claims rose from 14% to 22% | Prompt rule against unstated purpose or significance; unverified fell to 12% |
 | Seven threads sharing one SQLite connection returned empty searches | Retrieval runs sequentially (milliseconds); only model calls run in parallel |
+| Chat answers ran to 6 sentences, half unverified: a general "2 to 6 claims" rule overrode the chat's limit | The section's own guidance sets the count; the same question gave 3 sentences, all verified |
+| "Which company has a term loan?" made the model stretch Northwind's revolver into a "term loan" | A complete-list holdings summary, then agentic search across clients |
 
 ## 12. What production would need
 
 - **Identity and entitlements** from the firm's SSO and entitlement service, including information
-  barriers for MNPI, instead of demo profiles.
+  barriers for MNPI, instead of demo profiles. This is the prototype's one real hole: the user comes
+  from the request (`user_id`), so anyone who edits the request can act as Kim. Every other check is
+  enforced on the server.
 - **Connectors** to CRM, revenue, email and research with change data capture, so ingestion is
   incremental and briefings know exactly which records changed since they were prepared.
 - **Data platform**: Postgres with pgvector or the firm's search platform once the corpus outgrows a
@@ -233,5 +272,9 @@ Several design decisions came from measurements, not from the first draft:
   30-claim hand-labelled calibration set would quantify it.
 - One fact (Northwind's banking-services review) is sometimes missed because its only source is an
   email flagged as suspected injection, which is deliberately treated with caution.
+- Agentic search runs each tool per client (at most 10 per turn). For hundreds of clients it needs
+  portfolio-level tools (for example "holdings by product across my book") rather than a loop.
+- The judge occasionally accepts a stretched label (once, "term-style facility" for a revolver);
+  judge calibration against human labels is the fix.
 - Synthetic data, demo sign-in, no real integrations: this is a prototype of the workflow and its
   safety properties, not of the infrastructure.

@@ -52,12 +52,17 @@ A five-minute tour:
    highlighted, or the database row itself.
 3. **Look at the prep panel on the right.** Under To do, the overdue proposal is on top. Under Conflicts, "Changed" cards show what the
    last briefing said ($4.1M and growing, Dana Whitfield as CFO) next to what is true now.
-4. **Click the "Ask anything about Northwind" bar** at the bottom of the page (or "Ask about Northwind"
-   in the header) and ask anything. Answers are cited and verified like the briefing.
-5. **Switch to Sam, then to Kim, and open Helios.** Kim sees the Aurora mandate. Sam does not, and
-   nothing on Sam's page names it (only a general "some sources are restricted" notice).
-6. **Back on Home**, Companies lists each client with its aliases ("NWL" is Northwind), revenue
-   trend and your role; Facilities shows which credit lines mature soon.
+4. **Click the revenue figure.** The Calculation tab shows the working: the rule, each step of
+   arithmetic, the SQL as it ran and the rows used.
+5. **Ask in the bar at the bottom of the page.** "How should I prepare for the Northwind meeting?"
+   returns actions, each with its cited reason. Switch the scope to **All my clients** and ask "Which
+   client has a term loan?": the agent checks every client and shows what it looked at.
+6. **Switch to Sam, then to Kim, and ask about Helios:** "Is Helios selling any assets or wind
+   portfolios?" Kim gets the restricted Aurora deal. Sam does not, and nothing names it.
+7. **Open a client from Home** for the whole relationship, and **Data** in the top bar for the data
+   model, what unification did and the quality checks.
+
+More tested questions, grouped by what each one shows: [docs/DEMO_QUESTIONS.md](docs/DEMO_QUESTIONS.md).
 
 | Home | Ask chat |
 |---|---|
@@ -82,6 +87,7 @@ A five-minute tour:
 | Every number checked against its cited source; relationship metrics only from SQL | Judging whether cited sources support a claim |
 | Resolving aliases, duplicates, missing client IDs | Spotting conflicts between sources |
 | Key figures, contacts, revenue charts, pipeline | Extracting commitments from meeting notes |
+| Data quality checks; dates, counts and "complete list" facts | Choosing which tools to call for a question across clients (agentic search) |
 | Checking that cited IDs exist and quotes appear in the source | |
 | Deciding which side of a conflict is outdated | |
 
@@ -105,34 +111,34 @@ uv run python -m briefing.eval --repeat 2
 ```
 
 Rebuilds the data, generates a briefing for every user and client, and checks it against hand-written
-golden answers and 13 data traps. It prints PASS/FAIL per gate, writes `var/eval/latest.md`, and exits
+golden answers and 14 data traps. It prints PASS/FAIL per gate, writes `var/eval/latest.md`, and exits
 non-zero if any release gate fails. Golden facts are graded by a different model from the writer
 (`deepseek-reasoner`) so the grader does not share the writer's blind spots.
 
-Latest run (14 briefings):
+Latest run (14 briefings, report in [`eval/latest.md`](eval/latest.md)):
 
 | Gate | Result |
 |---|---|
-| Citations point to real, permitted sources | 935 / 935 |
-| Numbers in verified claims backed by SQL | 487 / 487 |
+| Citations point to real, permitted sources | 885 / 885 |
+| Numbers in verified claims backed by SQL | 496 / 496 |
 | Leaks across all users and clients | 0 |
-| Data traps handled (aliases, duplicates, stale, conflicts, missing IDs, restricted, injection) | 13 / 13 |
-| Golden facts present (gate 80%) | 85% |
-| Claims the verifier could not confirm (shown to the user as "Check sources") | 15% |
-| Time per briefing (median / p95) | 7.7 s / 8.5 s |
+| Data traps handled (aliases, duplicates, stale, conflicts, missing IDs, restricted, injection, probing the chat) | 14 / 14 |
+| Golden facts present (gate 80%) | 89% |
+| Claims the verifier could not confirm (shown to the user as "Check sources") | 12% |
+| Time per briefing (median / p95) | 7.0 s / 8.0 s |
 
 ## Development
 
 ```bash
 uv run uvicorn briefing.api:app --reload --port 8000   # API
 cd frontend && npm run dev                             # UI on :5173, proxies /api
-uv run pytest                                          # 89 tests, LLM mocked
+uv run pytest                                          # 102 tests, LLM mocked
 uv run ruff format src tests scripts && uv run ruff check src tests scripts
 ```
 
 | Path | |
 |---|---|
-| `src/briefing/` | `ingest` (data pack to SQLite), `tools` (typed, access-checked queries), `orchestrator` (retrieval, generation, verification), `verify`, `api`, `eval` |
+| `src/briefing/` | `ingest` (data pack to SQLite, quality checks), `tools` (typed, access-checked queries), `orchestrator` (retrieval, generation, verification), `agent` (search across clients), `verify`, `api`, `eval` |
 | `frontend/src/` | React app |
 | `data/`, `golden/` | Synthetic data pack and expected answers |
 | `specs/` | Requirements, the source of truth |
