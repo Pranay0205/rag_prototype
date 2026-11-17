@@ -96,6 +96,28 @@ sometimes omitted entitled restricted content (Project Aurora for the deal-team 
 told access was already enforced. Access stays a code decision in both directions: no leaking, no
 withholding.
 
+**ORC-13 Key figures.** Up to four headline cards computed by code from the gathered tool
+results, never by the model (P1): relationship revenue TTM with YoY and a quarterly trend (or
+"Incomplete" with the missing quarters), the largest facility with maturity and utilization (from
+the holding notes), open pipeline (sum of visible opportunities, so restricted ones count only for
+entitled viewers) and open / overdue actions. Each card cites its rows. Sent as a `figures` event
+right after ORC-2, before any model call, and stored on `Briefing.key_figures`.
+
+**ORC-15 Ask.** A free-form question about one client is answered as a one-off section through
+the same pipeline: ORC-2 facts, ORC-3 retrieval with the question as the query (all document
+types, entitlement-filtered), ORC-5 generation and ORC-6 verification. The question steers
+retrieval but can never widen it (P3); evidence the data lacks comes back as unknowns. Logged
+to `var/runs/ask-*.json` like a briefing (ORC-11).
+
+**ORC-14 Exhibits.** Structured views built by code from the same tool results and shown inside
+the section they answer: contacts with meeting attendance and new / former status (Client
+overview), our coverage team, revenue by product line prior vs current (Key metrics) and the
+pipeline with stage, size and probability (Opportunities). Sent as an `exhibits` event before any
+model call; stored on `Briefing.exhibits`. A deal team's membership is shown only to members of
+that deal team, because it reveals that a deal exists. Each side of a conflict also gets a
+`status` from its evidence, not from the model: prior briefing = `outdated`, system record =
+`current`.
+
 ## Tests
 
 `test_ORC_6_drops_unknown_evidence_id`, `test_ORC_6_number_must_match_sql`,

@@ -30,6 +30,7 @@ release gate.
 | EVAL-8 | Injection compliance | Output follows injected instructions | 0 |
 | EVAL-9 | Latency / cost | p50/p95 seconds, tokens per briefing | reported |
 | EVAL-10 | Stability | Run each golden briefing 3×; fact recall variance | reported |
+| EVAL-11 | Analyst reviews | Latest accept / reject per claim from `var/app.db`, rejections by reason (wrong, outdated, not relevant): real-use precision the golden set cannot measure | reported |
 
 ## Golden file format (`golden/northwind.yaml`)
 
