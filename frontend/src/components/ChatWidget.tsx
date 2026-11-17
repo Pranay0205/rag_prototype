@@ -133,7 +133,7 @@ export function ChatWidget({ userId, clients, currentClientId, open, onOpenChang
         <InkDot />
         <span className="flex min-w-0 flex-1 items-center gap-1.5">
           <span className="shrink-0 text-[14px] text-slate-500">Ask about</span>
-          <ClientPicker clients={clients} value={clientId} onChange={setClientId} />
+          <ClientPicker userId={userId} clients={clients} value={clientId} onChange={setClientId} />
         </span>
         <button
           onClick={() => setOpen(false)}
@@ -168,7 +168,7 @@ export function ChatWidget({ userId, clients, currentClientId, open, onOpenChang
             </p>
             {!client && (
               <div className="mt-5 flex flex-col items-center gap-1.5">
-                {clients.map((c) => (
+                {clients.slice(0, SUGGESTED_CLIENTS).map((c) => (
                   <button
                     key={c.client_id}
                     onClick={() => (pending ? ask(pending, c.client_id) : setClientId(c.client_id))}
@@ -177,6 +177,9 @@ export function ChatWidget({ userId, clients, currentClientId, open, onOpenChang
                     {c.name}
                   </button>
                 ))}
+                {clients.length > SUGGESTED_CLIENTS && (
+                  <p className="mt-1 text-[12px] text-slate-400">Or search all {clients.length} clients above, or name one in your question</p>
+                )}
               </div>
             )}
             {client && (
@@ -289,22 +292,46 @@ function Answer({ turn: t, onCite }: { turn: Turn; onCite: (c: Citation) => void
   )
 }
 
-/** "Switch client" pill with a styled menu (a native select rendered white-on-white on Windows). */
+/** "Switch client" pill with a searchable menu that scales to hundreds of clients: type a name or an
+ * alias (API-13, so "NWL" finds Northwind), the list scrolls, Enter picks the first match. */
 function ClientPicker({
+  userId,
   clients,
   value,
   onChange,
 }: {
+  userId: string
   clients: Props['clients']
   value: string | null
   onChange: (clientId: string) => void
 }) {
   const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [aliasHits, setAliasHits] = useState<string[]>([])
   const ref = useRef<HTMLSpanElement>(null)
   const current = clients.find((c) => c.client_id === value)
+  const q = query.trim().toLowerCase()
+  const shown = q ? clients.filter((c) => c.name.toLowerCase().includes(q) || aliasHits.includes(c.client_id)) : clients
+
+  function pick(clientId: string) {
+    onChange(clientId)
+    setOpen(false)
+    setQuery('')
+  }
+
+  // aliases and short names come from the same search the rest of the app uses
+  useEffect(() => {
+    if (!q) return setAliasHits([])
+    let live = true
+    const t = setTimeout(() => api.searchClients(userId, q).then((r) => live && setAliasHits(r.results.map((x) => x.client_id))), 200)
+    return () => {
+      live = false
+      clearTimeout(t)
+    }
+  }, [q, userId])
 
   useEffect(() => {
-    if (!open) return
+    if (!open) return setQuery('')
     const close = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false)
     const esc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -340,37 +367,48 @@ function ClientPicker({
         <span
           role="listbox"
           aria-label="Clients"
-          className="absolute left-0 top-full z-10 mt-2 block w-72 overflow-hidden rounded-xl bg-white py-1.5 text-slate-800 shadow-2xl ring-1 ring-slate-900/10"
+          className="absolute left-0 top-full z-10 mt-2 block w-80 overflow-hidden rounded-xl bg-white text-slate-800 shadow-2xl ring-1 ring-slate-900/10"
         >
-          {clients.map((c) => {
-            const selected = c.client_id === value
-            return (
-              <button
-                key={c.client_id}
-                type="button"
-                role="option"
-                aria-selected={selected}
-                onClick={() => {
-                  onChange(c.client_id)
-                  setOpen(false)
-                }}
-                className={cn(
-                  'flex w-full items-center gap-3 px-3 py-2 text-left text-[13.5px] transition hover:bg-indigo-50',
-                  selected && 'bg-indigo-50/60',
-                )}
-              >
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-indigo-50 text-[10.5px] font-semibold text-indigo-700">
-                  {initials(c.name)}
-                </span>
-                <span className="flex-1 truncate font-medium">{c.name}</span>
-                {selected && (
-                  <svg viewBox="0 0 20 20" className="h-4 w-4 text-indigo-600" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
-                    <path d="M5 10.5 8.5 14 15 6" />
-                  </svg>
-                )}
-              </button>
-            )
-          })}
+          <span className="block border-b border-slate-100 p-2">
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && shown[0] && pick(shown[0].client_id)}
+              placeholder={`Search ${clients.length} clients or an alias`}
+              aria-label="Search clients"
+              className="h-9 w-full rounded-full bg-slate-100 px-3.5 text-[13.5px] outline-none placeholder:text-slate-400 focus:bg-white focus:ring-1 focus:ring-slate-300"
+            />
+          </span>
+          <span className="block max-h-72 overflow-y-auto py-1.5">
+            {shown.length === 0 && <span className="block px-3 py-2 text-[13px] text-slate-500">No client you cover matches</span>}
+            {shown.map((c) => {
+              const selected = c.client_id === value
+              return (
+                <button
+                  key={c.client_id}
+                  type="button"
+                  role="option"
+                  aria-selected={selected}
+                  onClick={() => pick(c.client_id)}
+                  className={cn(
+                    'flex w-full items-center gap-3 px-3 py-2 text-left text-[13.5px] transition hover:bg-indigo-50',
+                    selected && 'bg-indigo-50/60',
+                  )}
+                >
+                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-indigo-50 text-[10.5px] font-semibold text-indigo-700">
+                    {initials(c.name)}
+                  </span>
+                  <span className="flex-1 truncate font-medium">{c.name}</span>
+                  {selected && (
+                    <svg viewBox="0 0 20 20" className="h-4 w-4 text-indigo-600" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+                      <path d="M5 10.5 8.5 14 15 6" />
+                    </svg>
+                  )}
+                </button>
+              )
+            })}
+            </span>
         </span>
       )}
     </span>
@@ -392,6 +430,8 @@ function shortName(name: string): string {
 /** The bar and the open panel share one surface: white, hairline border, soft warm shadow. */
 const SURFACE =
   'fixed bottom-5 left-1/2 z-30 w-[min(560px,calc(100vw-48px))] -translate-x-1/2 border border-slate-200 shadow-[0_12px_32px_-12px_rgba(26,24,20,0.35)]'
+
+const SUGGESTED_CLIENTS = 5 // the empty chat suggests a few; the picker searches all
 
 const USER_BUBBLE = 'max-w-[85%] rounded-[20px] rounded-br-md bg-slate-900 px-4 py-2 text-[13.5px] leading-snug text-white'
 
