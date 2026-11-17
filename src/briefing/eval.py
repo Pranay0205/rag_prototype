@@ -10,6 +10,7 @@ Writes var/eval/<run>.json and var/eval/latest.md; exits 1 if any release gate f
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
@@ -27,10 +28,52 @@ from briefing.schemas import Briefing, ClaimStatus, SectionKey, Viewer
 from briefing.tools import Tools, can_see
 from briefing.verify import check_numbers
 
+# Terminal colours: on for an interactive terminal, off when piped or when NO_COLOR is set.
+_COLOR = sys.stdout.isatty() and "NO_COLOR" not in os.environ
+
+
+def _c(code: str, text: str) -> str:
+    return f"\033[{code}m{text}\033[0m" if _COLOR else text
+
+
+def green(t: str) -> str:
+    return _c("32", t)
+
+
+def red(t: str) -> str:
+    return _c("31", t)
+
+
+def yellow(t: str) -> str:
+    return _c("33", t)
+
+
+def dim(t: str) -> str:
+    return _c("2", t)
+
+
+def bold(t: str) -> str:
+    return _c("1", t)
+
+
+def badge(ok: bool | None) -> str:
+    """PASS / FAIL / info, padded to one width so columns line up with or without colour."""
+    if ok is None:
+        return dim(" info ")
+    return _c("30;42", " PASS ") if ok else _c("97;41", " FAIL ")
+
+
+def bar(fraction: float, width: int = 20) -> str:
+    filled = round(fraction * width)
+    colour = green if fraction >= 0.8 else yellow if fraction >= 0.5 else red
+    return colour("█" * filled) + dim("░" * (width - filled))
+
+
 # Strings that must never appear for users without the matching access (EVAL-3). Source-ID checks
 # below catch structural leaks; these canaries catch paraphrased leaks.
 CANARIES = {
-    "restricted": ["aurora", "wind portfolio", "sell-side", "he_note_005", "o-202"],  # proj_aurora only
+    # proj_aurora only. "deal team" catches the Aurora deal team listed in a coverage view (ORC-14).
+    "restricted": ["aurora", "wind portfolio", "sell-side", "he_note_005", "o-202", "deal team"],
     "confidential": ["15 basis points", "15 bps", "he_email_004"],  # confidential clearance only
 }
 ID_COLUMNS = {
@@ -61,9 +104,15 @@ def generate(repeat: int) -> tuple[dict[tuple[str, str], list[Briefing]], list[f
     out: dict[tuple[str, str], list[Briefing]] = {}
     seconds = []
     with ThreadPoolExecutor(max_workers=3) as pool:
-        for pair, b, s in pool.map(one, jobs):
+        for i, (pair, b, s) in enumerate(pool.map(one, jobs), start=1):
             out.setdefault(pair, []).append(b)
             seconds.append(s)
+            claims = [c for sec in b.sections for c in sec.claims]
+            ok = sum(c.status == ClaimStatus.VERIFIED for c in claims)
+            print(
+                f"  {dim(f'[{i:>2}/{len(jobs)}]')} {green('✔')} {pair[0]:<5} {pair[1]}  "
+                f"{s:4.1f}s  {ok}/{len(claims)} claims verified"
+            )
     usage = {k: llm.usage[k] - usage_before[k] for k in llm.usage}
     return out, seconds, usage
 
@@ -317,8 +366,9 @@ def number_accuracy(conn, b: Briefing) -> tuple[int, list[str]]:
 
 
 def leak_scan(b: Briefing) -> list[str]:
-    """EVAL-3: canary strings for access the viewer does not have."""
-    text = (briefing_text(b) + " " + " ".join(c.source_id for c in all_citations(b))).lower()
+    """EVAL-3: canary strings for access the viewer does not have. Scans the whole briefing as served,
+    including key figures (ORC-13), exhibits (ORC-14) and every citation's text."""
+    text = b.model_dump_json().lower()
     leaks = []
     if "proj_aurora" not in b.viewer.groups:
         leaks += [w for w in CANARIES["restricted"] if w in text]
@@ -351,6 +401,22 @@ def golden_cases() -> list[dict]:
 
 
 # ---------------------------------------------------------------- main
+
+
+def analyst_reviews() -> str:
+    """EVAL-11: what analysts accepted and rejected in the app (latest decision per claim), with
+    rejection reasons. Real-use precision that the golden set cannot measure."""
+    if not config.APP_DB_PATH.exists():
+        return "no reviews yet"
+    latest: dict[tuple, tuple] = {}
+    for r in rows(connect(config.APP_DB_PATH), "SELECT * FROM claim_reviews ORDER BY at"):
+        latest[(r["briefing_id"], r["claim_id"])] = (r["decision"], r["note"] or "no reason")
+    decided = [v for v in latest.values() if v[0] != "clear"]
+    rejected = [note for decision, note in decided if decision == "reject"]
+    if not decided:
+        return "no reviews yet"
+    reasons = ", ".join(f"{n.replace('_', ' ')} {rejected.count(n)}" for n in sorted(set(rejected)))
+    return f"{len(rejected)}/{len(decided)} rejected" + (f" ({reasons})" if reasons else "")
 
 
 def main() -> int:
@@ -443,6 +509,7 @@ def main() -> int:
         ("EVAL-9", "Tokens per briefing (in + out)",
          f"{usage['prompt_tokens'] // n:,} + {usage['completion_tokens'] // n:,}", True, "reported"),
     ]  # fmt: skip
+    metrics.append(("EVAL-11", "Analyst reviews in the app", analyst_reviews(), True, "reported"))
     if args.repeat > 1:
         # EVAL-10 stability: for each case, how much recall moved between repeated runs
         per_case: dict[str, list[float]] = {}
@@ -455,29 +522,33 @@ def main() -> int:
         )
     gates_ok = all(ok for _, _, _, ok, _ in metrics) and unit.get("passed", True)
 
-    print("\n" + "=" * 92)
-    print(f"{'ID':8}{'Metric':48}{'Result':22}{'Gate':10}Status")
-    print("-" * 92)
+    rule = dim("─" * 96)
+    print("\n" + bold("RELEASE GATES AND METRICS"))
+    print(rule)
     for mid, name, result, ok, gate in metrics:
-        status = "PASS" if ok and gate != "reported" else ("info" if gate == "reported" else "FAIL")
-        print(f"{mid:8}{name:48}{result:22}{gate:10}{status}")
-    print("-" * 92)
+        status = badge(None if gate == "reported" else ok)
+        padded = f"{result:21} "  # pad before colouring: escape codes would break the column width
+        shown = padded if gate == "reported" else (green(padded) if ok else red(padded))
+        print(f"  {status}  {dim(f'{mid:8}')}{name:44}{shown}{dim(gate)}")
+    print(rule)
+    print(bold("TRAP SUITE") + dim("  data conditions the briefing must handle"))
     for t in traps:
-        print(
-            f"  {'PASS' if t['passed'] else 'FAIL'}  {t['id']:5} {t['name']}"
-            + ("" if t["passed"] else f"  -> {t['details']}")
-        )
+        trap_id = f"{t['id']:5}"
+        line = f"  {badge(t['passed'])}  {dim(trap_id)} {t['name']}"
+        print(line + ("" if t["passed"] else red(f"  -> {t['details']}")))
+    print(rule)
+    print(bold("GOLDEN FACT RECALL") + dim("  share of expected facts the briefing contains"))
     for g in golden:
-        recall = "  n/a" if g["recall"] is None else f"{g['recall']:5.0%}"
-        warn = "" if g["judge_mapping_ok"] else "  [judge output did not map cleanly; see report]"
-        print(
-            f"  recall {recall}  {g['case']}" + (f"  missing: {g['missing']}" if g["missing"] else "") + warn
-        )
-    print("=" * 92)
-    print(
-        f"RELEASE GATES: {'PASS' if gates_ok else 'FAIL'}   "
-        f"({time.time() - started:.0f}s, {len(every)} briefings)"
-    )
+        if g["recall"] is None:
+            print(f"  {dim(f'{"leak check only":>20}')}    n/a  {g['case']}")
+            continue
+        warn = "" if g["judge_mapping_ok"] else yellow("  [judge output did not map cleanly; see report]")
+        print(f"  {bar(g['recall'])}  {g['recall']:5.0%}  {g['case']}{warn}")
+        for m in g["missing"]:
+            print(dim(f"{'':31}missing: {m}"))
+    print(rule)
+    verdict = green(bold("ALL RELEASE GATES PASS")) if gates_ok else red(bold("RELEASE GATES FAIL"))
+    print(f"  {verdict}   {dim(f'{time.time() - started:.0f}s, {len(every)} briefings')}")
 
     run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
     out_dir = config.VAR_DIR / "eval"
