@@ -277,11 +277,8 @@ function Answer({ turn: t, onCite }: { turn: Turn; onCite: (c: Citation) => void
       {claims.map((c) => (
         <div key={c.id} className="group/claim">
           <p className="text-[13.5px] leading-relaxed text-slate-700">
-            <ClaimText claim={c} onCite={onCite} />
+            <ClaimText claim={c} onCite={onCite} after={<VerificationTag status={c.status} />} />
           </p>
-          <div className="mt-0.5">
-            <VerificationTag status={c.status} />
-          </div>
         </div>
       ))}
       {t.answer.unknowns.map((u) => (

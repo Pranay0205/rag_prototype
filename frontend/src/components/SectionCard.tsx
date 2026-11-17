@@ -54,28 +54,55 @@ export function SectionCard({ title, exhibit, section, reviews, onReview, onCite
   )
 }
 
-/** Claim text with inline citation markers: "... on 30 Sep 2026 [1]" -> clickable superscripts. */
-export function ClaimText({ claim, onCite }: { claim: Claim; onCite: (c: Citation) => void }) {
-  if (!claim.annotated) return <>{readable(claim.text)}</>
-  return (
-    <>
-      {claim.annotated.split(/(\[\d+\])/).map((part, i) => {
-        const n = /^\[(\d+)\]$/.exec(part)?.[1]
-        const citation = n ? claim.citations[Number(n) - 1] : undefined
-        if (!n) return <span key={i}>{readable(part)}</span>
-        if (!citation) return null
+/** Claim text with inline citation markers: "... on 30 Sep 2026 [1]" -> clickable superscripts.
+ * `after` (the verification badge) is glued to the last word so it never wraps onto a line alone. */
+export function ClaimText({ claim, onCite, after }: { claim: Claim; onCite: (c: Citation) => void; after?: ReactNode }) {
+  const parts = claim.annotated ? claim.annotated.split(/(\[\d+\])/) : [claim.text]
+  const nodes = parts.map((part, i) => {
+    const n = /^\[(\d+)\]$/.exec(part)?.[1]
+    if (!n) return readable(part)
+    const citation = claim.citations[Number(n) - 1]
+    if (!citation) return null
+    return (
+      <button
+        key={i}
+        onClick={() => onCite(citation)}
+        title={citation.quote ?? citation.snippet}
+        className="ml-[1px] align-super text-[10px] font-semibold leading-none tabular-nums text-indigo-500 hover:text-indigo-700 hover:underline"
+      >
+        {n}
+      </button>
+    )
+  })
+  if (!after) return <>{nodes}</>
+  // Glue the tail together: last word, any citation markers, punctuation and the badge.
+  const glue: ReactNode[] = []
+  let i = nodes.length - 1
+  for (; i >= 0; i--) {
+    const node = nodes[i]
+    if (typeof node === 'string' && /\s/.test(node)) {
+      const cut = node.search(/\S+\s*$/)
+      if (cut > 0) {
+        glue.unshift(node.slice(cut))
         return (
-          <button
-            key={i}
-            onClick={() => onCite(citation)}
-            title={citation.quote ?? citation.snippet}
-            className="ml-[1px] align-super text-[10px] font-semibold leading-none tabular-nums text-indigo-500 hover:text-indigo-700 hover:underline"
-          >
-            {n}
-          </button>
+          <>
+            {nodes.slice(0, i)}
+            {node.slice(0, cut)}
+            <span className="whitespace-nowrap">
+              {glue}
+              {after}
+            </span>
+          </>
         )
-      })}
-    </>
+      }
+    }
+    glue.unshift(node)
+  }
+  return (
+    <span className="whitespace-nowrap">
+      {glue}
+      {after}
+    </span>
   )
 }
 
@@ -106,11 +133,10 @@ function ClaimRow({
             rejected && 'text-slate-400 line-through decoration-slate-300',
           )}
         >
-          <ClaimText claim={claim} onCite={onCite} />
+          <ClaimText claim={claim} onCite={onCite} after={<VerificationTag status={claim.status} />} />
         </p>
 
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <VerificationTag status={claim.status} />
           <button
             onClick={() => setSourcesOpen((v) => !v)}
             aria-expanded={sourcesOpen}
@@ -213,7 +239,7 @@ export function VerificationTag({ status }: { status: Claim['status'] }) {
       <span
         title="Verified by the system: cited sources exist, numbers match the database, and the sources support the claim"
         aria-label="Verified"
-        className="inline-flex items-center text-[11.5px] font-medium text-emerald-600"
+        className="ml-1.5 inline-flex items-center align-[-2px] text-[11.5px] font-medium text-emerald-600 no-underline"
       >
         <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
           <path d="M10 2.5 16 5v4.5c0 3.7-2.6 6.9-6 8-3.4-1.1-6-4.3-6-8V5l6-2.5Z" strokeLinejoin="round" />
@@ -230,7 +256,7 @@ export function VerificationTag({ status }: { status: Claim['status'] }) {
   return (
     <span
       title="The system could not fully confirm this claim against its sources. Open the sources before relying on it."
-      className="inline-flex items-center gap-1 text-[11.5px] font-medium text-amber-600"
+      className="ml-1.5 inline-flex items-center gap-1 align-[-2px] text-[11.5px] font-medium text-amber-600 no-underline"
     >
       <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
         <path
