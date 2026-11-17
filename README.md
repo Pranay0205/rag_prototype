@@ -52,7 +52,7 @@ A five-minute tour:
    highlighted, or the database row itself.
 3. **Look at the right panel.** The overdue proposal is on top. The "Changed" cards show what the
    last briefing said ($4.1M and growing, Dana Whitfield as CFO) next to what is true now.
-4. **Click "Ask about Northwind"** (bottom right, on every page) and ask anything. Answers are
+4. **Click "Ask about Northwind"** (bottom left, on every page) and ask anything. Answers are
    cited and verified like the briefing.
 5. **Switch to Sam, then to Kim, and open Helios.** Kim sees the Aurora mandate. Sam does not, and
    nothing on Sam's page names it (only a general "some sources are restricted" notice).
