@@ -41,6 +41,9 @@ type Run = {
 
 type View = 'briefing' | 'notes' | 'ask'
 
+// The URL hash names the open meeting (#/meeting/M-901), so browser Back, Forward and reload work.
+const MEETING_HASH = /^#\/meeting\/(.+)$/
+
 const SESSION_KEY = 'briefing-desk.user'
 
 const IDLE: Run = {
@@ -82,7 +85,10 @@ export default function App() {
   }, [])
 
   // Switching user resets everything: a briefing is specific to the viewer's entitlements.
+  const firstUserEffect = useRef(true)
   useEffect(() => {
+    if (!firstUserEffect.current) window.history.replaceState(null, '', '#/')
+    firstUserEffect.current = false
     closeStream.current?.()
     setRun(IDLE)
     setMeeting(null)
@@ -145,11 +151,47 @@ export default function App() {
     [openSaved],
   )
 
+  /** Opening a meeting adds a browser history entry, so Back returns to where you came from. */
+  function openMeeting(m: Meeting) {
+    if (m.meeting_id !== meeting?.meeting_id) {
+      window.history.pushState({ meetingId: m.meeting_id }, '', `#/meeting/${m.meeting_id}`)
+    }
+    selectMeeting(m)
+  }
+
+  /** The Home link and the logo always go home; the browser's Back button steps through history. */
+  function goHome() {
+    window.history.pushState(null, '', '#/')
+    closeStream.current?.()
+    setMeeting(null)
+  }
+
   /** Search and the dashboard open a client through its next meeting (every covered client has one). */
   function openClient(clientId: string) {
     const m = meetings.find((x) => x.client_id === clientId)
-    if (m) selectMeeting(m)
+    if (m) openMeeting(m)
   }
+
+  // Browser Back / Forward: show whatever the URL now names.
+  useEffect(() => {
+    const onPop = () => {
+      const m = meetings.find((x) => x.meeting_id === MEETING_HASH.exec(window.location.hash)?.[1])
+      if (m) selectMeeting(m)
+      else {
+        closeStream.current?.()
+        setMeeting(null)
+      }
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [meetings, selectMeeting])
+
+  // Reload or shared link: once meetings load, reopen the meeting the URL names, if this user covers it.
+  useEffect(() => {
+    const m = meetings.find((x) => x.meeting_id === MEETING_HASH.exec(window.location.hash)?.[1])
+    if (m) selectMeeting(m)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meetings])
 
   async function prepare() {
     if (!meeting || !userId) return
@@ -218,10 +260,7 @@ export default function App() {
       <TopBar
         users={users}
         me={me}
-        onHome={() => {
-          closeStream.current?.()
-          setMeeting(null)
-        }}
+        onHome={goHome}
         onOpenClient={openClient}
         onSwitch={setUserId}
         onSignOut={() => setUserId(null)}
@@ -234,7 +273,7 @@ export default function App() {
               name={me?.name.split(' ')[0] ?? ''}
               onOpenMeeting={(id) => {
                 const m = meetings.find((x) => x.meeting_id === id)
-                if (m) selectMeeting(m)
+                if (m) openMeeting(m)
               }}
               onOpenClient={openClient}
             />
@@ -254,6 +293,7 @@ export default function App() {
                 total={allClaims.length}
                 history={history}
                 onOpenVersion={(id) => openSaved(meeting, id)}
+              onBack={goHome}
               />
 
               {view === 'notes' ? (
@@ -325,6 +365,7 @@ function MeetingHeader({
   total,
   history,
   onOpenVersion,
+  onBack,
 }: {
   meeting: Meeting
   run: Run
@@ -337,11 +378,21 @@ function MeetingHeader({
   total: number
   history: HistoryItem[]
   onOpenVersion: (briefingId: string) => void
+  onBack: () => void
 }) {
   const done = Object.keys(run.sections).length
   const allReviewed = total > 0 && reviewed === total
   return (
     <header className="mb-8">
+      <button
+        onClick={onBack}
+        className="-ml-2 mb-4 inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[13px] font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+      >
+        <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <path d="M12.5 4.5 7 10l5.5 5.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        Home
+      </button>
       <div className="text-[13px] font-medium text-indigo-600">{formatMeetingTime(meeting.start_time)}</div>
       <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-900">{meeting.legal_name}</h1>
       <p className="mt-1.5 text-[15px] text-slate-500">{meeting.purpose}</p>
