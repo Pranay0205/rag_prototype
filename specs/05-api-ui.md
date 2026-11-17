@@ -87,8 +87,8 @@ who reviewed it and how many claims were checked and removed.
 
 **UI-11 Home:** after sign-in: Next up (the next meeting, briefing ready or not, "Before you go in"
 chips: revenue trend, a facility maturing within 12 months, new key contacts); This week (meetings,
-one colour per client); Clients (revenue TTM and YoY, aliases); Facilities & maturities on a shared
-timeline with the next 12 months shaded. Replaces the meeting sidebar.
+one colour per client); Clients (revenue TTM and YoY, aliases); Facilities & maturities, soonest first, with
+those maturing within 12 months highlighted (a chart was tried and removed: with a few rows the dates say it all). Replaces the meeting sidebar.
 A dismissible "New here? Try" card offers three one-click starting points, each a direct action
 rather than an overlay pointing at the layout:
 - the revenue calculation of the next meeting's client;

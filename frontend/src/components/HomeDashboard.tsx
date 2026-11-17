@@ -256,55 +256,37 @@ function NextUp({
 }
 
 /** Facilities on a shared timeline from now to the latest maturity; the next 12 months are shaded. */
+/** Credit facilities, soonest maturity first (API-15 sorts them). A facility maturing within 12 months
+ * is the next refinancing conversation, so its row is highlighted. No chart: with a handful of rows the
+ * dates say it all. */
 function Facilities({ data, onOpenClient }: { data: HomeData; onOpenClient: (clientId: string) => void }) {
-  const start = new Date(data.today)
-  const lastYear = Math.max(start.getFullYear() + 5, ...data.facilities.map((f) => Number(f.maturity_date?.slice(0, 4) ?? 0)))
-  const end = new Date(`${lastYear}-12-31`)
-  const span = end.getTime() - start.getTime()
-  const at = (iso: string) => Math.min(100, Math.max(0, ((Date.parse(iso) - start.getTime()) / span) * 100))
-  const yearMark = (y: number) => at(`${y}-01-01`)
-  const twelve = at(new Date(start.getTime() + 365 * 86_400_000).toISOString())
-  const years = Array.from({ length: lastYear - start.getFullYear() }, (_, i) => start.getFullYear() + 1 + i)
-    .filter((y) => yearMark(y) > 8) // a year mark right after Now would overlap its label
-
   return (
     <section className={cn(CARD, 'rise flex flex-col gap-4 px-6 pb-6 pt-5')} style={{ animationDelay: '240ms' }}>
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-[17px] font-semibold">Facilities &amp; maturities</h2>
-        <span className="inline-flex items-center gap-1.5 text-[13px] text-slate-600">
-          <span aria-hidden="true" className="h-3 w-3 rounded-[3px] border border-amber-300 bg-amber-50" />
-          Within 12 months
-        </span>
+        <span className="text-[13px] text-slate-600">Soonest first</span>
       </header>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[760px] border-collapse text-[14px]">
+        <table className="w-full min-w-[520px] border-collapse text-[14px]">
           <thead>
             <tr className="text-left text-[12px] text-slate-600">
               <th scope="col" className="pb-2.5 pr-4 font-medium">Facility</th>
               <th scope="col" className="pb-2.5 pr-4 text-right font-medium">Size</th>
-              <th scope="col" className="w-[42%] pb-2.5 pr-4 font-medium">
-                <span className="relative block h-4">
-                  <span className="absolute left-0">Now</span>
-                  {years.map((y) => (
-                    <span key={y} className="absolute -translate-x-1/2" style={{ left: `${yearMark(y)}%` }}>
-                      {y}
-                    </span>
-                  ))}
-                </span>
-              </th>
               <th scope="col" className="pb-2.5 text-right font-medium">Matures</th>
             </tr>
           </thead>
           <tbody>
             {data.facilities.map((f) => {
-              const pos = f.maturity_date ? at(f.maturity_date) : 100
               const used = /utili[sz]ation\s+(\d+(?:\.\d+)?)%/i.exec(f.notes ?? '')?.[1]
               const tone = clientTone(f.client_id)
               return (
                 <tr
                   key={`${f.client_id}-${f.product}`}
                   onClick={() => onOpenClient(f.client_id)}
-                  className="cursor-pointer border-t border-slate-100 transition hover:bg-slate-50"
+                  className={cn(
+                    'cursor-pointer border-t border-slate-100 transition hover:bg-slate-50',
+                    f.matures_within_12m && 'bg-amber-50/40',
+                  )}
                 >
                   <th scope="row" className="py-4 pr-4 text-left font-normal">
                     <span className="flex items-center gap-2.5">
@@ -319,13 +301,6 @@ function Facilities({ data, onOpenClient }: { data: HomeData; onOpenClient: (cli
                     </span>
                   </th>
                   <td className="py-4 pr-4 text-right font-semibold tabular-nums">{money(f.notional_usd)}</td>
-                  <td className="py-4 pr-4" aria-hidden="true">
-                    <div className="relative h-7">
-                      <div className="absolute inset-y-0 left-0 rounded-md bg-amber-50" style={{ width: `${twelve}%` }} />
-                      <div className="absolute inset-x-0 top-[13px] h-0.5 bg-slate-200" />
-                      <div className={cn('grow-x absolute left-0 top-[11px] h-1.5 rounded-full', tone.solid)} style={{ width: `${pos}%` }} />
-                    </div>
-                  </td>
                   <td className="whitespace-nowrap py-4 text-right">
                     <span className="block">{f.maturity_date ? readable(f.maturity_date) : 'n/a'}</span>
                     {f.maturity_date && (
