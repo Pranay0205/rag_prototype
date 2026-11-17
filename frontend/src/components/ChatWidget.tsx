@@ -129,27 +129,7 @@ export function ChatWidget({ userId, clients, currentClientId, onCite }: Props) 
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-[11px] font-medium uppercase tracking-wider text-indigo-100">Ask about</span>
-          {/* a styled pill over the native select: looks like "switch client", keeps native keyboard access */}
-          <span className="relative mt-0.5 inline-flex max-w-full items-center gap-1.5 rounded-lg bg-white/10 py-0.5 pl-2 pr-1.5 transition hover:bg-white/20">
-            <span className="truncate text-[16px] font-semibold leading-tight">{client ? client.name : 'Choose a client'}</span>
-            <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 shrink-0 text-indigo-100" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <path d="M6.5 7.5 10 4l3.5 3.5M6.5 12.5 10 16l3.5-3.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <select
-              value={clientId ?? ''}
-              onChange={(e) => setClientId(e.target.value || null)}
-              aria-label="Client"
-              title="Switch client"
-              className="absolute inset-0 cursor-pointer opacity-0"
-            >
-              {!clientId && <option value="">Choose a client</option>}
-              {clients.map((c) => (
-                <option key={c.client_id} value={c.client_id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </span>
+          <ClientPicker clients={clients} value={clientId} onChange={setClientId} />
         </span>
         <button
           onClick={() => setOpen(false)}
@@ -304,6 +284,94 @@ function Answer({ turn: t, onCite }: { turn: Turn; onCite: (c: Citation) => void
         {t.answer.access_limited && ' · some sources restricted for your profile'}
       </p>
     </div>
+  )
+}
+
+/** "Switch client" pill with a styled menu (a native select rendered white-on-white on Windows). */
+function ClientPicker({
+  clients,
+  value,
+  onChange,
+}: {
+  clients: Props['clients']
+  value: string | null
+  onChange: (clientId: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLSpanElement>(null)
+  const current = clients.find((c) => c.client_id === value)
+
+  useEffect(() => {
+    if (!open) return
+    const close = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false)
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation() // close the menu, not the chat
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', close)
+    window.addEventListener('keydown', esc, true)
+    return () => {
+      document.removeEventListener('mousedown', close)
+      window.removeEventListener('keydown', esc, true)
+    }
+  }, [open])
+
+  return (
+    <span ref={ref} className="relative mt-0.5 block">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label="Client"
+        title="Switch client"
+        className="inline-flex max-w-full items-center gap-1.5 rounded-lg bg-white/10 py-0.5 pl-2 pr-1.5 text-left transition hover:bg-white/20"
+      >
+        <span className="truncate text-[16px] font-semibold leading-tight">{current ? current.name : 'Choose a client'}</span>
+        <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 shrink-0 text-indigo-100" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <path d="M6.5 7.5 10 4l3.5 3.5M6.5 12.5 10 16l3.5-3.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      {open && (
+        <span
+          role="listbox"
+          aria-label="Clients"
+          className="absolute left-0 top-full z-10 mt-2 block w-72 overflow-hidden rounded-xl bg-white py-1.5 text-slate-800 shadow-2xl ring-1 ring-slate-900/10"
+        >
+          {clients.map((c) => {
+            const selected = c.client_id === value
+            return (
+              <button
+                key={c.client_id}
+                type="button"
+                role="option"
+                aria-selected={selected}
+                onClick={() => {
+                  onChange(c.client_id)
+                  setOpen(false)
+                }}
+                className={cn(
+                  'flex w-full items-center gap-3 px-3 py-2 text-left text-[13.5px] transition hover:bg-indigo-50',
+                  selected && 'bg-indigo-50/60',
+                )}
+              >
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-indigo-50 text-[10.5px] font-semibold text-indigo-700">
+                  {initials(c.name)}
+                </span>
+                <span className="flex-1 truncate font-medium">{c.name}</span>
+                {selected && (
+                  <svg viewBox="0 0 20 20" className="h-4 w-4 text-indigo-600" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+                    <path d="M5 10.5 8.5 14 15 6" />
+                  </svg>
+                )}
+              </button>
+            )
+          })}
+        </span>
+      )}
+    </span>
   )
 }
 
