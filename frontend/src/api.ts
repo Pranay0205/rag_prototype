@@ -165,6 +165,7 @@ export interface AskAnswer {
   unknowns: Unknown[]
   explanation: string | null // what a term means; general, not from client records
   explanation_source: 'glossary' | 'model' | null // the app's own guide, or a labelled model explanation
+  steps?: string[] // agentic search (API-20): what was looked at, e.g. "Products held: Northwind, Helios"
   access_limited: boolean
 }
 
@@ -376,6 +377,9 @@ export const api = {
 
   clientOverview: (clientId: string, userId: string) =>
     request<ClientOverview>(`/api/clients/${clientId}/overview?user_id=${userId}`),
+
+  /** API-20: a question across every covered client, answered by agentic search (ORC-16). */
+  askAll: (userId: string, question: string) => post<AskAnswer>('/api/ask', { user_id: userId, question }),
 
   ask: (clientId: string, userId: string, question: string) =>
     post<AskAnswer>(`/api/clients/${clientId}/ask`, { user_id: userId, question }),

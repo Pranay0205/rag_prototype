@@ -126,6 +126,24 @@ Questions about what a term means are answered in two ways:
 
 Code also caps chat answers at 3 claims.
 
+**ORC-16 Agentic search** (`agent.py`). A question across every client the viewer covers ("Which
+client has a term loan?") is answered by a planner loop:
+- **Planning:** each turn the fast model picks ONE typed tool (list_clients, products_held, revenue,
+  pipeline, people, interactions, documents) and the client IDs to run it for, or stops.
+- **Execution:** code runs the tools. Coverage and entitlements are enforced inside them (P3), so a
+  client the model names but the viewer cannot see comes back refused, never as data. Refusals are
+  reported to the planner, never worked around.
+- **Bounds:** at most 4 turns and 10 clients per turn. Observations are truncated.
+- **Answer:** everything gathered becomes evidence, titled with its client's name, for the normal
+  writer and verifier (ORC-5, ORC-6). The answer is therefore cited and checked like any other, and
+  capped at 3 claims.
+- **Shown with the answer:** the steps taken ("Looked at: Client list · Products held: Northwind,
+  Helios, Cascade").
+- **Logging:** `var/runs/agent-*.json` holds the steps and the planner's reasoning.
+- **Glossary:** the app's own labels are answered from it first (ORC-15).
+
+Single-client questions keep the fixed retrieval of ORC-15: faster and deterministic.
+
 **ORC-14 Exhibits.** Structured views built by code from the same tool results and shown inside
 the section they answer: contacts with meeting attendance and new / former status (Client
 overview), our coverage team, revenue by product line prior vs current (Key metrics) and the

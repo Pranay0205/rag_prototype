@@ -7,6 +7,14 @@ import type { Citation } from '../types'
 import { ClaimText, VerificationTag } from './SectionCard'
 import { cn, readable } from './ui'
 
+const ALL = '*' // scope: every client the viewer covers (agentic search, API-20)
+
+const ALL_SUGGESTIONS = [
+  'Which client has a term loan?',
+  'Where are we overdue across my clients?',
+  'Which facilities mature in the next 12 months?',
+]
+
 const SUGGESTIONS = [
   'What has the client asked for recently?',
   'What are we overdue on?',
@@ -27,10 +35,9 @@ interface Props {
 
 export function ChatWidget({ userId, clients, currentClientId, open, onOpenChange, onCite }: Props) {
   const setOpen = onOpenChange
-  const [clientId, setClientId] = useState<string | null>(currentClientId)
+  const [clientId, setClientId] = useState<string>(currentClientId ?? ALL)
   const [threads, setThreads] = useState<Record<string, Turn[]>>({})
   const [text, setText] = useState('')
-  const [pending, setPending] = useState<string | null>(null) // asked before a client was chosen
   const [detected, setDetected] = useState<ClientSearch['results'][number] | null>(null) // named in the text
   const scroller = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLInputElement>(null)
@@ -42,12 +49,13 @@ export function ChatWidget({ userId, clients, currentClientId, open, onOpenChang
   // a new profile starts with no conversations
   useEffect(() => {
     setThreads({})
-    setClientId(currentClientId)
+    setClientId(currentClientId ?? ALL)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
 
   const client = clients.find((c) => c.client_id === clientId)
-  const turns = clientId ? (threads[clientId] ?? []) : []
+  const isAll = clientId === ALL
+  const turns = threads[clientId] ?? []
   const busy = turns.some((t) => !t.answer && !t.error)
 
   useEffect(() => {
@@ -80,18 +88,12 @@ export function ChatWidget({ userId, clients, currentClientId, open, onOpenChang
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text, userId])
 
-  async function ask(question: string, forClient?: string) {
+  async function ask(question: string) {
     const q = question.trim()
     if (!q || busy) return
-    // a client named in the question wins; then the one in view; then ask which
-    const named = forClient ? null : (detected ?? (await clientNamedIn(q)))
-    const cid = forClient ?? named?.client_id ?? clientId
-    if (!cid) {
-      setPending(q) // keep the question and ask which client it is about
-      setText('')
-      return
-    }
-    setPending(null)
+    // a client named in the question wins; otherwise the scope chosen (one client, or all of them)
+    const named = detected ?? (await clientNamedIn(q))
+    const cid = named?.client_id ?? clientId
     setClientId(cid)
     const id = Date.now()
     const started = performance.now()
@@ -100,7 +102,7 @@ export function ChatWidget({ userId, clients, currentClientId, open, onOpenChang
     setText('')
     setThreads((th) => ({ ...th, [cid]: [...(th[cid] ?? []), { id, question: q }] }))
     try {
-      const answer = await api.ask(cid, userId, q)
+      const answer = cid === ALL ? await api.askAll(userId, q) : await api.ask(cid, userId, q)
       update({ answer, seconds: (performance.now() - started) / 1000 })
     } catch (e) {
       update({ error: (e as ApiError).message })
@@ -116,7 +118,7 @@ export function ChatWidget({ userId, clients, currentClientId, open, onOpenChang
       >
         <InkDot />
         <span className="flex-1 truncate text-[14px] text-slate-500">
-          {client ? `Ask anything about ${shortName(client.name)}` : 'Ask about any client you cover'}
+          {client ? `Ask anything about ${shortName(client.name)}` : 'Ask across all the clients you cover'}
         </span>
         <span className="text-[12px] font-medium text-slate-400">Cited answers</span>
       </button>
@@ -148,43 +150,16 @@ export function ChatWidget({ userId, clients, currentClientId, open, onOpenChang
       </header>
 
       <div ref={scroller} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
-        {pending && (
-          <div className="flex justify-end">
-            <p className={USER_BUBBLE}>{pending}
-            </p>
-          </div>
-        )}
         {turns.length === 0 && (
-          <div className={cn('text-center', pending ? 'pt-1' : 'pt-6')}>
+          <div className="pt-6 text-center">
             <p className="text-sm font-medium text-slate-700">
-              {pending
-                ? 'Which client is this about?'
-                : client
-                  ? `Ask anything about ${shortName(client.name)}`
-                  : 'Ask about any client you cover'}
+              {client ? `Ask anything about ${shortName(client.name)}` : 'Ask across all the clients you cover'}
             </p>
             <p className="mx-auto mt-1 max-w-[280px] text-[12px] leading-snug text-slate-400">
               Answers use only sources you are cleared for, are cited inline and checked like the briefing.
             </p>
-            {!client && (
-              <div className="mt-5 flex flex-col items-center gap-1.5">
-                {clients.slice(0, SUGGESTED_CLIENTS).map((c) => (
-                  <button
-                    key={c.client_id}
-                    onClick={() => (pending ? ask(pending, c.client_id) : setClientId(c.client_id))}
-                    className="rounded-full bg-white px-3.5 py-1.5 text-[13px] font-medium text-slate-700 ring-1 ring-slate-200 transition hover:bg-indigo-50 hover:text-indigo-700 hover:ring-indigo-200"
-                  >
-                    {c.name}
-                  </button>
-                ))}
-                {clients.length > SUGGESTED_CLIENTS && (
-                  <p className="mt-1 text-[12px] text-slate-400">Or search all {clients.length} clients above, or name one in your question</p>
-                )}
-              </div>
-            )}
-            {client && (
-              <div className="mt-5 flex flex-col items-center gap-1.5">
-                {SUGGESTIONS.map((s) => (
+            <div className="mt-5 flex flex-col items-center gap-1.5">
+                {(isAll ? ALL_SUGGESTIONS : SUGGESTIONS).map((s) => (
                   <button
                     key={s}
                     onClick={() => ask(s)}
@@ -193,8 +168,7 @@ export function ChatWidget({ userId, clients, currentClientId, open, onOpenChang
                     {s}
                   </button>
                 ))}
-              </div>
-            )}
+            </div>
           </div>
         )}
 
@@ -229,7 +203,7 @@ export function ChatWidget({ userId, clients, currentClientId, open, onOpenChang
           ref={input}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder={client ? 'Ask a question' : 'Ask a question, e.g. what is overdue for Northwind?'}
+          placeholder={client ? 'Ask a question' : 'Ask across your clients, e.g. which has a term loan?'}
           aria-label="Your question"
           className="h-9 min-w-0 flex-1 bg-transparent text-[14px] text-slate-800 outline-none placeholder:text-slate-400"
         />
@@ -268,6 +242,9 @@ function Answer({ turn: t, onCite }: { turn: Turn; onCite: (c: Citation) => void
   const verified = claims.filter((c) => c.status === 'verified').length
   return (
     <div className="max-w-[92%] space-y-2.5 rounded-[20px] rounded-bl-md bg-slate-50 px-4 py-3 ring-1 ring-slate-200/70">
+      {t.answer.steps && t.answer.steps.length > 0 && (
+        <p className="text-[11.5px] text-slate-400">Looked at: {t.answer.steps.join(' · ')}</p>
+      )}
       {t.answer.explanation && (
         <div>
           <p className="text-[13.5px] leading-relaxed text-slate-700">{t.answer.explanation}</p>
@@ -310,7 +287,7 @@ function ClientPicker({
 }: {
   userId: string
   clients: Props['clients']
-  value: string | null
+  value: string
   onChange: (clientId: string) => void
 }) {
   const [open, setOpen] = useState(false)
@@ -366,7 +343,7 @@ function ClientPicker({
         title="Switch client"
         className="inline-flex max-w-full items-center gap-1.5 rounded-full py-1 pl-2.5 pr-2 text-left transition hover:bg-slate-100"
       >
-        <span className="truncate text-[14px] font-semibold leading-tight text-slate-900">{current ? current.name : 'Choose a client'}</span>
+        <span className="truncate text-[14px] font-semibold leading-tight text-slate-900">{current ? current.name : 'All my clients'}</span>
         <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
           <path d="M6.5 7.5 10 4l3.5 3.5M6.5 12.5 10 16l3.5-3.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
@@ -389,7 +366,27 @@ function ClientPicker({
             />
           </span>
           <span className="block max-h-72 overflow-y-auto py-1.5">
-            {shown.length === 0 && <span className="block px-3 py-2 text-[13px] text-slate-500">No client you cover matches</span>}
+            {!q && (
+            <button
+              type="button"
+              role="option"
+              aria-selected={value === ALL}
+              onClick={() => pick(ALL)}
+              className={cn('flex w-full items-center gap-3 border-b border-slate-100 px-3 py-2 text-left text-[13.5px] transition hover:bg-indigo-50', value === ALL && 'bg-indigo-50/60')}
+            >
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-slate-900 text-white">
+                <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
+                  <rect x="3" y="3" width="6" height="6" rx="1.5" /><rect x="11" y="3" width="6" height="6" rx="1.5" />
+                  <rect x="3" y="11" width="6" height="6" rx="1.5" /><rect x="11" y="11" width="6" height="6" rx="1.5" />
+                </svg>
+              </span>
+              <span className="flex-1">
+                <span className="block font-medium">All my clients</span>
+                <span className="block text-[12px] text-slate-500">Searches across your book</span>
+              </span>
+            </button>
+          )}
+          {shown.length === 0 && <span className="block px-3 py-2 text-[13px] text-slate-500">No client you cover matches</span>}
             {shown.map((c) => {
               const selected = c.client_id === value
               return (
@@ -438,8 +435,6 @@ function shortName(name: string): string {
 /** The bar and the open panel share one surface: white, hairline border, soft warm shadow. */
 const SURFACE =
   'fixed bottom-5 left-1/2 z-30 w-[min(560px,calc(100vw-48px))] -translate-x-1/2 border border-slate-200 shadow-[0_12px_32px_-12px_rgba(26,24,20,0.35)]'
-
-const SUGGESTED_CLIENTS = 5 // the empty chat suggests a few; the picker searches all
 
 const USER_BUBBLE = 'max-w-[85%] rounded-[20px] rounded-br-md bg-slate-900 px-4 py-2 text-[13.5px] leading-snug text-white'
 

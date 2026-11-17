@@ -28,6 +28,7 @@ Status: DRAFT for review
 | API-8 | `POST /actions` `{client_id, kind, description, owner, due, citations}` | Create follow-up / flag stale |
 | API-9 | `POST /clients/{id}/notes` `{user_id, text}` | Post-meeting notes → proposed commitments (fast model); returns proposals, nothing saved until confirmed |
 | API-10 | `GET /health/data` | Ingestion report (ING-11) |
+| API-20 | `POST /ask` `{user_id, question}` | A question across every covered client, by agentic search (ORC-16); returns the ORC-15 shape plus `steps` |
 | API-19 | `GET /data/overview?user_id` | The data page (UI-15). Each table with its columns, key, links (by column name: `client_id` → clients, etc.) and row count; merges with their evidence; alias count; document linking; index; ING-12 quality checks with their SQL. Metadata, counts and IDs only, no record contents |
 | API-11 | `GET /briefings/latest?user_id&client_id[&briefing_id]` | The viewer's last saved briefing with their reviews and created actions; `stale` if data was re-ingested since. Saved per viewer, never shared; coverage re-checked on read; not served if the viewer's clearance or groups changed since (must regenerate). User state lives in `var/app.db`, separate from the rebuildable source DB |
 | API-13 | `GET /clients/search?user_id&q` | Company search (TOOL-14); `notice` when only an out-of-coverage client matches |
@@ -115,7 +116,10 @@ The source drawer's Calculation tab (TOOL-16) is the per-figure view of the same
 
 **UI-13 Ask chat:** a hovering ask bar at the bottom centre of every page, plus "Ask about <client>" in the
 briefing header and "Ask about this client" on Home; the panel opens in place and can switch client
-through a searchable picker over every covered client (name or alias via API-13), not only those with a meeting. Typing is never blocked. While
+through a searchable picker over every covered client (name or alias via API-13), not only those with a meeting.
+The picker's first option, "All my clients", asks across the whole book (API-20). It is the default when no
+client is on screen, and each answer shows what was looked at. Naming one client in the question
+still scopes the answer to that client. Typing is never blocked. While
 the user types, the client named in the question is detected (API-13, aliases included) and shown
 ("About Northwind Logistics, from NWL"); otherwise the client on screen is used; with neither, the
 chat keeps the question and asks which client it is about. Suggested questions; each answer shows

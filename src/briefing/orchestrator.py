@@ -424,6 +424,33 @@ def key_figures(facts: FactSheet) -> list[KeyFigure]:
     return out
 
 
+def doc_evidence(chunk: dict, citation: Citation) -> Evidence:
+    """A retrieved document chunk as evidence, with the flags the writer and judge must see.
+    Shared by briefing sections (ORC-3) and agentic search (ORC-16)."""
+    flags = [
+        f
+        for f, on in (
+            ("DERIVED", chunk["derived"]),
+            ("STALE", chunk["stale"]),
+            ("INFERRED-LINK", chunk["link_method"] == "inferred"),
+            ("SUSPECTED-INJECTION", chunk["suspected_injection"]),
+            # No classification labels: access is enforced in code before retrieval (P3), and
+            # measured in eval, a RESTRICTED label made the model withhold entitled content.
+        )
+        if on
+    ]
+    return Evidence(
+        "",
+        citation,
+        "document",
+        chunk["text"],
+        derived=chunk["derived"],
+        flags=flags,
+        suspected_injection=chunk["suspected_injection"],
+        meta=f'{chunk["doc_type"]} | {chunk["date"]} | {chunk["author"]} | "{chunk["title"]}"',
+    )
+
+
 def build_evidence(
     tools: Tools, viewer: Viewer, client_id: str, spec: SectionSpec, facts: FactSheet
 ) -> tuple[list[Evidence], bool, list[str], list[str]]:
@@ -457,30 +484,7 @@ def build_evidence(
                 dropped.append(citation.source_id)
                 continue
             budget -= len(chunk["text"])
-            flags = [
-                f
-                for f, on in (
-                    ("DERIVED", chunk["derived"]),
-                    ("STALE", chunk["stale"]),
-                    ("INFERRED-LINK", chunk["link_method"] == "inferred"),
-                    ("SUSPECTED-INJECTION", chunk["suspected_injection"]),
-                    # No classification labels: access is enforced in code before retrieval (P3), and
-                    # measured in eval, a RESTRICTED label made the model withhold entitled content.
-                )
-                if on
-            ]
-            items.append(
-                Evidence(
-                    "",
-                    citation,
-                    "document",
-                    chunk["text"],
-                    derived=chunk["derived"],
-                    flags=flags,
-                    suspected_injection=chunk["suspected_injection"],
-                    meta=f'{chunk["doc_type"]} | {chunk["date"]} | {chunk["author"]} | "{chunk["title"]}"',
-                )
-            )
+            items.append(doc_evidence(chunk, citation))
     for n, item in enumerate(items, start=1):
         item.eid = f"E{n}"
     return items, access_limited, dropped, warnings
@@ -818,6 +822,13 @@ def deterministic_actions(
 EventSink = Callable[[str, dict], None]
 
 
+def viewer_line(viewer: Viewer) -> str:
+    """The viewer as the writer sees them: role, clearance and access groups."""
+    return f"{viewer.role}, clearance {viewer.clearance}" + (
+        f", cleared for {', '.join(viewer.groups)}" if viewer.groups else ""
+    )
+
+
 def _context(tools: Tools, viewer: Viewer, facts: FactSheet) -> tuple[dict, dict | None]:
     """Prompt context shared by briefing sections and questions, plus the next meeting."""
     client = facts.profile["client"]
@@ -828,8 +839,7 @@ def _context(tools: Tools, viewer: Viewer, facts: FactSheet) -> tuple[dict, dict
         attendees = ", ".join(meeting["client_attendees"])
         meeting_line = f"{meeting['start_time']} - {meeting['purpose']} with {attendees}"
     context = {
-        "viewer": f"{viewer.role}, clearance {viewer.clearance}"
-        + (f", cleared for {', '.join(viewer.groups)}" if viewer.groups else ""),
+        "viewer": viewer_line(viewer),
         "client_name": client["legal_name"],
         "client_id": client["client_id"],
         "today": config.TODAY.isoformat(),

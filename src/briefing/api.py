@@ -17,7 +17,7 @@ from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from briefing import config, llm, orchestrator, prompts
+from briefing import agent, config, llm, orchestrator, prompts
 from briefing.db import connect, jlist, rows
 from briefing.schemas import Briefing, Viewer
 from briefing.tools import ToolResult, Tools, can_see
@@ -532,6 +532,26 @@ def ask(client_id: str, a: Ask):
     t = tools()
     try:
         return orchestrator.answer_question(t, a.user_id, client_id, a.question)
+    except orchestrator.BriefingError as e:
+        raise HTTPException(HTTP_STATUS.get(e.code, 400), {"code": e.code, "message": str(e)}) from e
+    except llm.LLMError as e:
+        raise HTTPException(503, {"code": "UNAVAILABLE", "message": str(e)}) from e
+
+
+class AskAll(BaseModel):
+    user_id: str
+    question: str
+    client_id: str | None = None  # the client on screen, a hint for the planner
+
+
+@app.post("/api/ask")
+def ask_all(a: AskAll):
+    """API-20: a question across every client the viewer covers, answered by agentic search
+    (ORC-16): the model picks typed tools, entitlements are enforced inside them, and the answer
+    is cited and verified like any other."""
+    t = tools()
+    try:
+        return agent.answer_across_clients(t, a.user_id, a.question, a.client_id)
     except orchestrator.BriefingError as e:
         raise HTTPException(HTTP_STATUS.get(e.code, 400), {"code": e.code, "message": str(e)}) from e
     except llm.LLMError as e:
