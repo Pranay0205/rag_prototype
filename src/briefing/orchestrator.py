@@ -531,7 +531,7 @@ def _conflict_status(ev: Evidence) -> str | None:
     return "current" if ev.kind == "sql" else None
 
 
-def exhibits(facts: FactSheet, attendees: list[str], viewer_id: str) -> Exhibits:
+def exhibits(facts: FactSheet, attendees: list[str]) -> Exhibits:
     """ORC-14: contacts (with meeting attendance), coverage team, revenue by product line and the
     pipeline, rendered by the UI as lists and charts. Rows come only from the viewer's tool results,
     so entitlements already apply."""
@@ -551,16 +551,12 @@ def exhibits(facts: FactSheet, attendees: list[str], viewer_id: str) -> Exhibits
     ]
     order = {"new": 0, "current": 1, "former": 2}
     contacts.sort(key=lambda c: (not c.attending, order[c.status]))
-    # A deal team's membership is itself confidential (it reveals that a deal exists), so it is shown
-    # only to members of that deal team.
-    team = facts.profile.get("coverage_team", [])
-    on_deal_team = any(m["user_id"] == viewer_id and m["coverage_role"] == "deal_team" for m in team)
+    # deal-team members are already filtered out by TOOL-5 for anyone not on that deal team (DATA-2)
     coverage = [
         CoverageMember(
             name=m["name"], role=m["coverage_role"].replace("_", " "), primary=bool(m["is_primary"])
         )
-        for m in team
-        if m["coverage_role"] != "deal_team" or on_deal_team
+        for m in facts.profile.get("coverage_team", [])
     ]
     lines = [
         RevenueLine(
@@ -993,7 +989,7 @@ def run_briefing(
         on_event("figures", [f.model_dump(mode="json") for f in figures])
     client = facts.profile["client"]
     context, meeting = _context(tools, viewer, facts)
-    views = exhibits(facts, meeting["client_attendees"] if meeting else [], viewer.user_id)
+    views = exhibits(facts, meeting["client_attendees"] if meeting else [])
     if on_event:  # ORC-14: lists and charts render before any model call, like the key figures
         on_event("exhibits", views.model_dump(mode="json"))
 

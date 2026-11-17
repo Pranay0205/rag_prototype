@@ -303,7 +303,7 @@ def test_ORC_13_key_figures_respect_entitlements(tools):
 
 def test_ORC_14_exhibits_from_sql(tools):
     facts = orchestrator.gather(tools, tools.viewer("alex"), "C-001")
-    views = orchestrator.exhibits(facts, ["Raj Menon", "Lucia Ferrante"], "alex")
+    views = orchestrator.exhibits(facts, ["Raj Menon", "Lucia Ferrante"])
     contacts = {c.name: (c.status, c.attending) for c in views.contacts}
     assert contacts["Raj Menon"] == ("new", True) and contacts["Dana Whitfield"] == ("former", False)
     assert views.contacts[0].name == "Raj Menon"  # attending and new first
@@ -314,7 +314,7 @@ def test_ORC_14_exhibits_from_sql(tools):
 
 def test_ORC_14_deal_team_and_restricted_pipeline_hidden_from_others(tools):
     def views(user):
-        return orchestrator.exhibits(orchestrator.gather(tools, tools.viewer(user), "C-002"), [], user)
+        return orchestrator.exhibits(orchestrator.gather(tools, tools.viewer(user), "C-002"), [])
 
     for user in ("sam", "alex"):  # neither is on the Aurora deal team
         v = views(user)

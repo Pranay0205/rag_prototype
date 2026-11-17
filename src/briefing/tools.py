@@ -396,6 +396,10 @@ class Tools:
                                   FROM coverage cv JOIN users u USING (user_id) WHERE cv.client_id=?""",
             (cid,),
         )
+        # DATA-2: a deal team's membership is itself confidential (it reveals that a deal exists),
+        # so it is returned only to members of that deal team, here, before any screen or model sees it
+        on_deal_team = any(m["user_id"] == viewer.user_id and m["coverage_role"] == "deal_team" for m in team)
+        team = [m for m in team if m["coverage_role"] != "deal_team" or on_deal_team]
         since = (config.TODAY - timedelta(days=config.STALE_AFTER_DAYS)).isoformat()
         contacts = rows(
             self.conn,

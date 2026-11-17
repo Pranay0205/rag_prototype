@@ -278,7 +278,6 @@ export function ClientPage({ clientId, userId, onCite, onOpenMeeting, onAsk }: P
             <p className="mt-3 border-t border-slate-100 pt-3 text-[13px] text-slate-600">
               Our coverage ·{' '}
               {data.coverage
-                .filter((m) => m.coverage_role !== 'deal_team')
                 .map((m) => `${m.name} (${m.coverage_role.replace(/_/g, ' ')}${m.is_primary ? ', primary' : ''})`)
                 .join(' · ')}
             </p>
