@@ -603,6 +603,59 @@ def home(user_id: str):
     }
 
 
+@app.get("/api/clients/{client_id}/overview")
+def client_overview(client_id: str, user_id: str):
+    """API-18: the client as a whole (not one meeting): profile, coverage, contacts, revenue,
+    holdings, financials, pipeline, service issues, actions, interactions, meetings and documents.
+    Composed from the typed tools, so coverage and entitlements apply; no model involved. Each row
+    carries the citation that opens it in the source drawer."""
+    t = tools()
+    viewer = viewer_or_404(t, user_id)
+    profile = t.get_client_profile(viewer, client_id)
+    raise_for(profile)
+    cid = profile.data["client"]["client_id"]
+    results = {
+        "revenue": t.get_revenue(viewer, cid),
+        "holdings": t.get_holdings(viewer, cid),
+        "financials": t.get_financials(viewer, cid),
+        "pipeline": t.get_pipeline(viewer, cid),
+        "interactions": t.get_interactions(viewer, cid, limit=12),
+        "documents": t.list_documents(viewer, cid),
+    }
+    cites = {s.source_id: s.model_dump(mode="json") for r in [profile, *results.values()] for s in r.sources}
+
+    def rows_with(items: list[dict], prefix: str, key: str) -> list[dict]:
+        return [{**i, "citation": cites.get(f"{prefix}{i[key]}")} for i in items]
+
+    p, pipe = profile.data, results["pipeline"].data or {}
+    meetings = t.get_meetings(viewer, cid).data
+    return {
+        "client": {**p["client"], "citation": cites.get(f"sql:clients/{cid}")},
+        "aliases": p["aliases"],
+        "coverage": p["coverage_team"],
+        "contacts": rows_with(p["contacts"], "sql:contacts/", "contact_id"),
+        "revenue": {**(results["revenue"].data or {}), "citation": cites.get(f"sql:revenue/{cid}/summary")},
+        "holdings": rows_with(results["holdings"].data or [], "sql:holdings/", "holding_id"),
+        "financials": [
+            {**f, "citation": cites.get(f"sql:financials/{cid}/{f['fiscal_period'].replace(' ', '_')}")}
+            for f in results["financials"].data or []
+        ],
+        "opportunities": rows_with(pipe.get("opportunities", []), "sql:opportunities/", "opp_id"),
+        "issues": rows_with(pipe.get("service_issues", []), "sql:service_issues/", "issue_id"),
+        "actions": rows_with(pipe.get("open_actions", []), "sql:open_actions/", "action_id"),
+        "interactions": rows_with(
+            (results["interactions"].data or {}).get("interactions", []),
+            "sql:interactions/",
+            "interaction_id",
+        ),
+        "meetings": meetings,
+        "documents": [
+            {**d, "citation": cites.get(f"doc:{d['doc_id']}#0")} for d in results["documents"].data or []
+        ],
+        "access_limited": any(r.access_limited for r in [profile, *results.values()]),
+    }
+
+
 # ---------------------------------------------------------------- API-10
 
 

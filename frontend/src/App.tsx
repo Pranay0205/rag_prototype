@@ -6,6 +6,7 @@ import { ChatWidget } from './components/ChatWidget'
 import { HistoryMenu } from './components/HistoryMenu'
 import { ContactsExhibit, PipelineExhibit, RevenueExhibit } from './components/Exhibits'
 import { BriefingIndex, FIGURES_ANCHOR } from './components/BriefingIndex'
+import { ClientPage } from './components/ClientPage'
 import { HomeDashboard } from './components/HomeDashboard'
 import { KeyFigures } from './components/KeyFigures'
 import { NotesCapture } from './components/NotesCapture'
@@ -44,6 +45,7 @@ type View = 'briefing' | 'notes'
 
 // The URL hash names the open meeting (#/meeting/M-901), so browser Back, Forward and reload work.
 const MEETING_HASH = /^#\/meeting\/(.+)$/
+const CLIENT_HASH = /^#\/client\/(.+)$/
 
 const SESSION_KEY = 'briefing-desk.user'
 
@@ -72,6 +74,7 @@ export default function App() {
   })
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [meeting, setMeeting] = useState<Meeting | null>(null)
+  const [clientPage, setClientPage] = useState<string | null>(null) // UI-14: open client page
   const [run, setRun] = useState<Run>(IDLE)
   const [view, setView] = useState<View>('briefing')
   const [reviews, setReviews] = useState<Record<string, Review>>({})
@@ -162,6 +165,7 @@ export default function App() {
 
   /** Opening a meeting adds a browser history entry, so Back returns to where you came from. */
   function openMeeting(m: Meeting) {
+    setClientPage(null)
     if (m.meeting_id !== meeting?.meeting_id) {
       window.history.pushState({ meetingId: m.meeting_id }, '', `#/meeting/${m.meeting_id}`)
     }
@@ -173,6 +177,7 @@ export default function App() {
     window.history.pushState(null, '', '#/')
     closeStream.current?.()
     setMeeting(null)
+    setClientPage(null)
   }
 
   /** "Ask about ..." buttons open the chat on that client. */
@@ -181,16 +186,19 @@ export default function App() {
     setChatOpen(true)
   }
 
-  /** Search and the dashboard open a client through its next meeting (every covered client has one). */
+  /** UI-14: a client opens its own page (the whole relationship), not its next meeting. */
   function openClient(clientId: string) {
-    const m = meetings.find((x) => x.client_id === clientId)
-    if (m) openMeeting(m)
+    window.history.pushState({ clientId }, '', `#/client/${clientId}`)
+    closeStream.current?.()
+    setMeeting(null)
+    setClientPage(clientId)
   }
 
   // Browser Back / Forward: show whatever the URL now names.
   useEffect(() => {
     const onPop = () => {
       const m = meetings.find((x) => x.meeting_id === MEETING_HASH.exec(window.location.hash)?.[1])
+      setClientPage(m ? null : (CLIENT_HASH.exec(window.location.hash)?.[1] ?? null))
       if (m) selectMeeting(m)
       else {
         closeStream.current?.()
@@ -205,6 +213,7 @@ export default function App() {
   useEffect(() => {
     const m = meetings.find((x) => x.meeting_id === MEETING_HASH.exec(window.location.hash)?.[1])
     if (m) selectMeeting(m)
+    else setClientPage(CLIENT_HASH.exec(window.location.hash)?.[1] ?? null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meetings])
 
@@ -300,6 +309,7 @@ export default function App() {
   }
 
   const me = users.find((u) => u.user_id === userId)
+  const clientName = clientPage ? meetings.find((m) => m.client_id === clientPage)?.legal_name : undefined
   if (!userId) return <SignIn users={users} onSignIn={setUserId} />
   const allClaims = run.briefing?.sections.flatMap((s) => s.claims) ?? []
   const rails = !!meeting && view === 'briefing' && run.status !== 'idle'
@@ -316,13 +326,26 @@ export default function App() {
         users={users}
         me={me}
         onHome={goHome}
-        crumb={meeting ? meeting.legal_name.replace(/ (Inc\.|plc|LLC)$/, '') : null}
+        crumb={(meeting?.legal_name ?? clientName)?.replace(/ (Inc\.|plc|LLC)$/, '') ?? null}
         onSwitch={setUserId}
         onSignOut={() => setUserId(null)}
       />
       {/* One canvas and one scroll: side panels are sticky cards beside the briefing, not separate strips */}
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {!meeting && (
+        {!meeting && clientPage && (
+          <ClientPage
+            clientId={clientPage}
+            userId={userId}
+            onCite={setDrawer}
+            onOpenMeeting={(id) => {
+              const m = meetings.find((x) => x.meeting_id === id)
+              if (m) openMeeting(m)
+            }}
+            onAsk={askAbout}
+          />
+        )}
+
+        {!meeting && !clientPage && (
           <HomeDashboard
             userId={userId}
             name={me?.name.split(' ')[0] ?? ''}
@@ -424,7 +447,7 @@ export default function App() {
       <ChatWidget
         userId={userId}
         clients={[...new Map(meetings.map((m) => [m.client_id, { client_id: m.client_id, name: m.legal_name }])).values()]}
-        currentClientId={chatClient ?? meeting?.client_id ?? null}
+        currentClientId={chatClient ?? meeting?.client_id ?? clientPage}
         open={chatOpen}
         onOpenChange={setChatOpen}
         onCite={setDrawer}

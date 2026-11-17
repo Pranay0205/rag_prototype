@@ -199,6 +199,50 @@ class Tools:
             )
         return ToolResult(ok=True, data=ms)
 
+    # ------------------------------------------------------------ TOOL-15
+
+    @tool
+    def list_documents(self, viewer: Viewer, client_id: str) -> ToolResult:
+        """TOOL-15: the client's documents the viewer may see, newest first: no duplicates, no
+        quarantined news, entitlements applied (DATA-1). Metadata only; the text is read through
+        API-6, which re-checks access."""
+        cid = self._cid(client_id)
+        docs = rows(
+            self.conn,
+            """SELECT doc_id, doc_type, title, date, author, classification, access_groups, derived,
+                      stale, link_method FROM documents
+               WHERE client_id=? AND duplicate_of IS NULL AND quarantined=0 ORDER BY date DESC""",
+            (cid,),
+        )
+        visible = [d for d in docs if can_see(viewer, d["classification"], jlist(d["access_groups"]))]
+        keys = [
+            "doc_id",
+            "doc_type",
+            "title",
+            "date",
+            "author",
+            "classification",
+            "derived",
+            "stale",
+            "link_method",
+        ]
+        sources = [
+            Citation(
+                source_id=f"doc:{d['doc_id']}#0",
+                kind=SourceKind.DOCUMENT,
+                title=d["title"],
+                date=date.fromisoformat(d["date"]) if d["date"] else None,
+                snippet="",
+            )
+            for d in visible
+        ]
+        return ToolResult(
+            ok=True,
+            data=[{k: d[k] for k in keys} for d in visible],
+            sources=sources,
+            access_limited=len(visible) < len(docs),
+        )
+
     # ------------------------------------------------------------ TOOL-14
 
     def search_clients(self, viewer: Viewer, query: str) -> ToolResult:

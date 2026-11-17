@@ -273,3 +273,19 @@ def test_ORC_8_suggestions_carry_their_origin(client):
     ]
     origins = {a["id"].split("-")[0]: a["origin"] for a in actions}
     assert origins["overdue"] == "records"  # open actions in the database, not the model
+
+
+def test_API_18_client_overview_respects_access(client):
+    def overview(user):
+        return client.get("/api/clients/C-002/overview", params={"user_id": user}).json()
+
+    alex, kim = overview("alex"), overview("kim")
+    assert alex["client"]["legal_name"] == "Helios Renewables plc"
+    assert {h["product"] for h in alex["holdings"]} >= {"Term Loan", "Green Loan"}
+    assert all(r["citation"] for r in alex["holdings"] + alex["contacts"])  # every row opens its source
+    alex_docs = {d["doc_id"] for d in alex["documents"]}
+    assert "he_note_005" not in alex_docs and alex["access_limited"]  # Aurora note: deal team only
+    assert "he_note_005" in {d["doc_id"] for d in kim["documents"]}
+    assert any("Aurora" in o["product"] for o in kim["opportunities"])
+    assert all("Aurora" not in o["product"] for o in alex["opportunities"])
+    assert client.get("/api/clients/C-001/overview", params={"user_id": "kim"}).status_code == 403

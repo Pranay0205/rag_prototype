@@ -1,5 +1,5 @@
 // Typed client for the FastAPI backend (specs/05-api-ui.md). Vite proxies /api to :8000.
-import type { Briefing, Conflict, Exhibits, KeyFigure, Section, Unknown } from './types'
+import type { Briefing, Citation, Conflict, Exhibits, KeyFigure, Section, Unknown } from './types'
 
 export interface User {
   user_id: string
@@ -152,6 +152,100 @@ export interface ClientAction {
   origin: ActionOrigin | null
 }
 
+type Cited = { citation: Citation | null }
+
+/** API-18: the client as a whole. Rows carry the citation that opens them in the source drawer. */
+export interface ClientOverview {
+  client: Cited & {
+    client_id: string
+    legal_name: string
+    short_name: string
+    lei: string
+    segment: string
+    industry: string
+    hq_city: string
+    hq_country: string
+    created_date: string
+  }
+  aliases: string[]
+  coverage: { user_id: string; name: string; coverage_role: string; is_primary: number }[]
+  contacts: (Cited & {
+    contact_id: string
+    name: string
+    title: string
+    is_active: number
+    start_date: string
+    end_date: string | null
+    changed_recently: boolean
+  })[]
+  revenue: Cited & {
+    current_period?: string
+    total?: { current_ttm: number | null; prior_ttm: number | null; yoy_pct: number | null }
+    by_product_line?: { product_line: string; current_ttm: number | null; prior_ttm: number | null; yoy_pct: number | null }[]
+    quarterly?: { period: string; total: number | null }[]
+    missing_quarters?: string[]
+  }
+  holdings: (Cited & {
+    holding_id: string
+    product: string
+    notional_usd: number | null
+    opened_date: string
+    maturity_date: string | null
+    notes: string | null
+    matures_within_12m: boolean
+  })[]
+  financials: (Cited & {
+    fiscal_period: string
+    company_revenue_usd_m: number
+    ebitda_margin_pct: number
+    net_leverage_x: number
+    source: string
+  })[]
+  opportunities: (Cited & {
+    opp_id: string
+    product: string
+    stage: string
+    est_revenue_usd: number
+    probability_pct: number
+    next_step: string | null
+  })[]
+  issues: (Cited & {
+    issue_id: string
+    severity: string
+    status: string
+    summary: string
+    opened_date: string
+    resolved_date: string | null
+  })[]
+  actions: (Cited & {
+    action_id: string
+    description: string
+    owner: string
+    due_date: string
+    status: string
+    overdue: boolean
+    days_overdue: number
+  })[]
+  interactions: (Cited & {
+    interaction_id: string
+    date: string
+    type: string
+    subject: string
+    client_attendees: string
+  })[]
+  meetings: Meeting[]
+  documents: (Cited & {
+    doc_id: string
+    doc_type: string
+    title: string
+    date: string
+    classification: string
+    derived: number
+    link_method: string
+  })[]
+  access_limited: boolean
+}
+
 export interface HistoryItem {
   briefing_id: string
   created_at: string
@@ -246,6 +340,9 @@ export const api = {
 
   searchClients: (userId: string, q: string) =>
     request<ClientSearch>(`/api/clients/search?user_id=${userId}&q=${encodeURIComponent(q)}`),
+
+  clientOverview: (clientId: string, userId: string) =>
+    request<ClientOverview>(`/api/clients/${clientId}/overview?user_id=${userId}`),
 
   ask: (clientId: string, userId: string, question: string) =>
     post<AskAnswer>(`/api/clients/${clientId}/ask`, { user_id: userId, question }),

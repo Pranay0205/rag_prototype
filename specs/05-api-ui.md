@@ -34,6 +34,7 @@ Status: DRAFT for review
 | API-15 | `GET /home?user_id` | Dashboard: upcoming meetings (with whether a briefing is prepared), covered companies with revenue TTM and YoY, facilities sorted by maturity |
 | API-16 | `GET /actions?user_id&client_id` | The viewer's own actions for a client (ticked suggestions, typed-in items, commitments from notes) with `origin`, so they carry into later briefings |
 | API-17 | `DELETE /actions/{id}?user_id` | Untick or remove an action; creator only |
+| API-18 | `GET /clients/{id}/overview?user_id` | The client as a whole: profile, aliases, coverage, contacts, revenue, holdings, financials, pipeline, service issues, actions, interactions, meetings, documents (TOOL-15). Composed from the typed tools, so coverage and entitlements apply; no model. Every row carries its citation; `access_limited` when anything was withheld |
 | API-12 | `GET /briefings/history?user_id&client_id` | The viewer's own saved versions for a client, newest first: `briefing_id`, `created_at`, `stale`, claim / verified / conflict counts. Opening one goes through API-11 with `briefing_id`, so the same access checks apply |
 
 Errors: tool error codes map to HTTP (`FORBIDDEN`/`NOT_IN_COVERAGE` → 403, `NOT_FOUND` → 404,
@@ -90,7 +91,14 @@ timeline with the next 12 months shaded. Replaces the meeting sidebar.
 **UI-12 Top bar:** brand (home) and the profile menu (switch profile, data health, sign out). A
 company search box was tried and removed: the home cards list every covered client, and the chat
 picks its client. API-13 remains available. Browser Back / Forward and reload follow the open
-meeting (`#/meeting/<id>`); the briefing page has a Home link.
+meeting or client (`#/meeting/<id>`, `#/client/<id>`); the breadcrumb has a Home link.
+
+**UI-14 Client page:** clicking a client (Home's Clients list or a facility) opens the relationship
+as a whole, not the meeting briefing (API-18): headline numbers (revenue TTM and YoY, products held,
+open pipeline, open actions), quarterly revenue and product lines, products and facilities, pipeline,
+interaction history, upcoming meetings (each opens its briefing), people and coverage, open actions and
+service issues, the client's reported financials, and the documents the viewer may see. Every row
+opens its source in the drawer. Straight from the database, so it loads instantly.
 
 **UI-13 Ask chat:** a hovering ask bar at the bottom centre of every page, plus "Ask about <client>" in the
 briefing header and "Ask about this client" on Home; the panel opens in place and can switch client. Typing is never blocked. While
