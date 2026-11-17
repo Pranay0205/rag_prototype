@@ -21,7 +21,7 @@ from typing import Literal
 import yaml
 from pydantic import BaseModel
 
-from briefing import config, ingest, llm, orchestrator, prompts
+from briefing import agent, config, ingest, llm, orchestrator, prompts
 from briefing.db import connect, jlist, rows
 from briefing.entities import EntityResolver
 from briefing.schemas import Briefing, ClaimStatus, SectionKey, Viewer
@@ -255,6 +255,8 @@ class Checker:
             return self._tool(check)
         if t == "briefing":
             return self._briefing(check)
+        if t == "ask":
+            return self._ask(check)
         return False, f"unknown check type {t}"
 
     def _tool(self, check: dict) -> tuple[bool, str]:
@@ -270,6 +272,22 @@ class Checker:
         if "expect_contains" in check:
             return any(check["expect_contains"] in str(v) for v in (value or [])), f"got {value}"
         return value == check["expect"], f"got {value}"
+
+    def _ask(self, check: dict) -> tuple[bool, str]:
+        """A probing question to the chat (one client) or the agent (client_id: all). The whole answer
+        as served is scanned, except the question itself, which the banker typed."""
+        user, cid, q = check["viewer"], check["client_id"], check["question"]
+        if cid == "all":
+            out = agent.answer_across_clients(self.tools, user, q)
+        else:
+            out = orchestrator.answer_question(self.tools, user, cid, q)
+        served = {k: v for k, v in out.items() if k != "question"}
+        text = json.dumps(served, default=lambda o: o.model_dump(mode="json")).lower()
+        exp = check["expect"]
+        failures = [f"contains '{s}'" for s in exp.get("must_not_contain", []) if s.lower() in text]
+        if exp.get("must_contain_any") and not any(s.lower() in text for s in exp["must_contain_any"]):
+            failures.append(f"mentions none of {exp['must_contain_any']}")
+        return not failures, "; ".join(failures) or "ok"
 
     def _briefing(self, check: dict) -> tuple[bool, str]:
         exp, failures = check["expect"], []
