@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { api, type HomeData } from '../api'
 import { money } from './Exhibits'
-import { Spinner, cn, formatTime, readable } from './ui'
+import { CARD, CardHeader, GLYPH, Spinner, cn, formatTime, readable } from './ui'
 
 interface Props {
   userId: string
@@ -64,7 +64,7 @@ export function HomeDashboard({ userId, name, onOpenMeeting, onOpenClient }: Pro
       </p>
 
       <div className="mt-8 grid gap-5 lg:grid-cols-3">
-        <Card title="Meetings" count={data.meetings.length} index={0} icon={<path d="M3.5 6.5h13v10h-13zM3.5 9.5h13M7 3.5v3M13 3.5v3" />}>
+        <Card title="Meetings" count={data.meetings.length} index={0} icon={GLYPH.meetings}>
           {data.meetings.map((m) => {
             const when = new Date(m.start_time)
             const days = daysUntil(data.today, m.start_time)
@@ -101,7 +101,7 @@ export function HomeDashboard({ userId, name, onOpenMeeting, onOpenClient }: Pro
           })}
         </Card>
 
-        <Card title="Companies" count={data.companies.length} index={1} icon={<path d="M3.5 16.5v-11l6-3v14M9.5 16.5v-8l7 2.5v5.5M2 16.5h16M6 8h1M6 11h1M12.5 12h1" />}>
+        <Card title="Companies" count={data.companies.length} index={1} icon={GLYPH.companies}>
           {data.companies.map((c) => {
             const down = (c.yoy_pct ?? 0) < 0
             return (
@@ -145,7 +145,7 @@ export function HomeDashboard({ userId, name, onOpenMeeting, onOpenClient }: Pro
           })}
         </Card>
 
-        <Card title="Facilities & maturities" count={data.facilities.length} index={2} icon={<path d="M5.5 2.5h6.5l3.5 3.5v11.5h-10zM12 2.5V6h3.5M8 10h5M8 13h5" />}>
+        <Card title="Facilities & maturities" count={data.facilities.length} index={2} icon={GLYPH.facilities}>
           {data.facilities.map((f) => {
             const days = f.maturity_date ? daysUntil(data.today, f.maturity_date) : null
             const used = /utili[sz]ation\s+(\d+(?:\.\d+)?)%/i.exec(f.notes ?? '')?.[1]
@@ -190,19 +190,10 @@ export function HomeDashboard({ userId, name, onOpenMeeting, onOpenClient }: Pro
 
 function Card({ title, count, index, icon, children }: { title: string; count: number; index: number; icon: ReactNode; children: ReactNode }) {
   return (
-    <section
-      className="rise flex flex-col overflow-hidden rounded-2xl bg-white shadow-[0_1px_2px_rgba(15,23,42,0.03),0_12px_32px_-16px_rgba(15,23,42,0.12)] ring-1 ring-slate-900/[0.05]"
-      style={{ animationDelay: `${120 + index * 80}ms` }}
-    >
-      <header className="flex items-center gap-2.5 border-b border-slate-100 px-5 py-4">
-        <span className="grid h-7 w-7 place-items-center rounded-lg bg-indigo-50 text-indigo-600">
-          <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            {icon}
-          </svg>
-        </span>
-        <h2 className="text-[15px] font-semibold tracking-tight text-slate-900">{title}</h2>
-        <span className="rounded-full bg-slate-100 px-2 text-[11px] font-medium tabular-nums text-slate-500">{count}</span>
-      </header>
+    <section className={cn(CARD, 'rise flex flex-col overflow-hidden')} style={{ animationDelay: `${120 + index * 80}ms` }}>
+      <div className="border-b border-slate-100 px-5 py-4">
+        <CardHeader icon={icon} title={title} count={count} />
+      </div>
       <div className="divide-y divide-slate-100">{children}</div>
     </section>
   )

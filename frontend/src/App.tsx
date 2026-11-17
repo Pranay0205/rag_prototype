@@ -12,7 +12,7 @@ import { SectionCard, type RejectReason, type Review } from './components/Sectio
 import { SignIn } from './components/SignIn'
 import { SourceDrawer } from './components/SourceDrawer'
 import { TopBar } from './components/TopBar'
-import { Logo, SECTION_ORDER, Spinner, cn, formatMeetingTime, readable } from './components/ui'
+import { GLYPH, Logo, SECTION_ORDER, Spinner, cn, formatMeetingTime, readable } from './components/ui'
 import {
   NO_EXHIBITS,
   type Briefing,
@@ -254,6 +254,7 @@ export default function App() {
   const me = users.find((u) => u.user_id === userId)
   if (!userId) return <SignIn users={users} onSignIn={setUserId} />
   const allClaims = run.briefing?.sections.flatMap((s) => s.claims) ?? []
+  const rails = !!meeting && view === 'briefing' && run.status !== 'idle'
 
   return (
     <div className="flex h-full flex-col">
@@ -264,33 +265,40 @@ export default function App() {
         onSwitch={setUserId}
         onSignOut={() => setUserId(null)}
       />
-      <div className="flex min-h-0 flex-1">
-        {/* Actions on the left, read first; conflicts and gaps on the right */}
-        {meeting && view === 'briefing' && run.status !== 'idle' && (
-          <AttentionPanel
-            briefing={run.briefing}
-            running={run.status === 'running'}
-            actionStates={actionStates}
-            onAction={act}
-            onCite={setDrawer}
-            side="left"
+      {/* One canvas and one scroll: side panels are sticky cards beside the briefing, not separate strips */}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {!meeting && (
+          <HomeDashboard
+            userId={userId}
+            name={me?.name.split(' ')[0] ?? ''}
+            onOpenMeeting={(id) => {
+              const m = meetings.find((x) => x.meeting_id === id)
+              if (m) openMeeting(m)
+            }}
+            onOpenClient={openClient}
           />
         )}
-        <main className="min-w-0 flex-1 overflow-y-auto">
-          {!meeting && (
-            <HomeDashboard
-              userId={userId}
-              name={me?.name.split(' ')[0] ?? ''}
-              onOpenMeeting={(id) => {
-                const m = meetings.find((x) => x.meeting_id === id)
-                if (m) openMeeting(m)
-              }}
-              onOpenClient={openClient}
-            />
-          )}
 
-          {meeting && (
-            <div className="mx-auto max-w-3xl px-8 py-10">
+        {meeting && (
+          <div
+            className={cn(
+              'mx-auto px-6 py-8',
+              rails ? 'grid max-w-[1560px] items-start gap-6 xl:grid-cols-[300px_minmax(0,1fr)_340px]' : 'max-w-3xl',
+            )}
+          >
+            {rails && (
+              <aside className="xl:sticky xl:top-8 xl:max-h-[calc(100vh-8rem)] xl:overflow-y-auto">
+                <AttentionPanel
+                  briefing={run.briefing}
+                  running={run.status === 'running'}
+                  actionStates={actionStates}
+                  onAction={act}
+                  onCite={setDrawer}
+                  side="left"
+                />
+              </aside>
+            )}
+            <main className="min-w-0">
               <MeetingHeader
                 meeting={meeting}
                 run={run}
@@ -303,7 +311,7 @@ export default function App() {
                 total={allClaims.length}
                 history={history}
                 onOpenVersion={(id) => openSaved(meeting, id)}
-              onBack={goHome}
+                onBack={goHome}
               />
 
               {view === 'notes' ? (
@@ -321,6 +329,7 @@ export default function App() {
                         <SectionCard
                           key={s.key}
                           title={s.title}
+                          icon={GLYPH[s.key]}
                           exhibit={
                             s.key === 'client_overview' ? (
                               <ContactsExhibit exhibits={run.exhibits} onCite={setDrawer} />
@@ -340,22 +349,21 @@ export default function App() {
                   )}
                 </>
               )}
-            </div>
-          )}
-        </main>
-
-        {meeting && view === 'briefing' && run.status !== 'idle' && (
-          <AttentionPanel
-            briefing={run.briefing}
-            running={run.status === 'running'}
-            actionStates={actionStates}
-            onAction={act}
-            onCite={setDrawer}
-            side="right"
-          />
+            </main>
+            {rails && (
+              <aside className="xl:sticky xl:top-8 xl:max-h-[calc(100vh-8rem)] xl:overflow-y-auto xl:pb-24">
+                <AttentionPanel
+                  briefing={run.briefing}
+                  running={run.status === 'running'}
+                  actionStates={actionStates}
+                  onAction={act}
+                  onCite={setDrawer}
+                  side="right"
+                />
+              </aside>
+            )}
+          </div>
         )}
-
-
       </div>
 
       <ChatWidget

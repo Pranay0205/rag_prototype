@@ -153,7 +153,7 @@ function RevenueBar({ line: l, max }: { line: RevenueLine; max: number }) {
 const STAGE_TONE: Record<string, string> = {
   mandated: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
   'proposal pending': 'bg-indigo-50 text-indigo-700 ring-indigo-200',
-  qualified: 'bg-sky-50 text-sky-700 ring-sky-200',
+  qualified: 'bg-indigo-50/60 text-indigo-600 ring-indigo-100',
   identified: 'bg-slate-100 text-slate-600 ring-slate-200',
   stalled: 'bg-amber-50 text-amber-700 ring-amber-200',
 }

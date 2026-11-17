@@ -1,7 +1,7 @@
 // UI-3 section card, UI-6 claim review, sources with exact quotes (UI-4).
 import { useState, type ReactNode } from 'react'
 import type { Citation, Claim, Section } from '../types'
-import { VerifiedPill, cn, readable } from './ui'
+import { CARD, CardHeader, VerifiedPill, cn, readable } from './ui'
 
 export type RejectReason = 'wrong' | 'outdated' | 'not_relevant'
 export interface Review {
@@ -17,6 +17,7 @@ const REASONS: { key: RejectReason; label: string; icon: ReactNode }[] = [
 
 interface Props {
   title: string
+  icon: ReactNode
   exhibit?: ReactNode // ORC-14 structured view, shown above the claims as soon as it arrives
   section?: Section
   reviews: Record<string, Review>
@@ -24,16 +25,19 @@ interface Props {
   onCite: (citation: Citation) => void
 }
 
-export function SectionCard({ title, exhibit, section, reviews, onReview, onCite }: Props) {
+export function SectionCard({ title, icon, exhibit, section, reviews, onReview, onCite }: Props) {
   const verified = section?.claims.filter((c) => c.status === 'verified').length ?? 0
   return (
-    <section className="rounded-2xl bg-white p-6 shadow-[0_1px_2px_rgba(15,23,42,0.03),0_8px_24px_-16px_rgba(15,23,42,0.10)] ring-1 ring-slate-900/[0.04]">
-      <header className="mb-2 flex items-center justify-between gap-4">
-        <h2 className="text-[15px] font-semibold tracking-tight text-slate-800">{title}</h2>
-        {section && (
-          <VerifiedPill confidence={section.confidence} verified={verified} total={section.claims.length} />
-        )}
-      </header>
+    <section className={cn(CARD, 'p-6')}>
+      <div className="mb-3">
+        <CardHeader
+          icon={icon}
+          title={title}
+          right={
+            section && <VerifiedPill confidence={section.confidence} verified={verified} total={section.claims.length} />
+          }
+        />
+      </div>
 
       {exhibit}
       {!section && <SkeletonLines />}

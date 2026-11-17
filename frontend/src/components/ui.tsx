@@ -78,6 +78,64 @@ export function Spinner({ className = 'h-4 w-4' }: { className?: string }) {
   )
 }
 
+/** The one card surface: sections, key figures, side panels and home cards all use it. */
+export const CARD =
+  'rounded-2xl bg-white ring-1 ring-slate-900/[0.06] shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-16px_rgba(15,23,42,0.12)]'
+
+const TILE = {
+  indigo: 'bg-indigo-50 text-indigo-600',
+  amber: 'bg-amber-50 text-amber-600',
+  rose: 'bg-rose-50 text-rose-600',
+  slate: 'bg-slate-100 text-slate-500',
+}
+
+/** The one card header: icon tile, title, optional count and a right-hand slot. */
+export function CardHeader({
+  icon,
+  title,
+  count,
+  tone = 'indigo',
+  right,
+}: {
+  icon: ReactNode
+  title: string
+  count?: number
+  tone?: keyof typeof TILE
+  right?: ReactNode
+}) {
+  return (
+    <header className="flex items-center gap-2.5">
+      <span className={cn('grid h-7 w-7 shrink-0 place-items-center rounded-lg', TILE[tone])}>
+        <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          {icon}
+        </svg>
+      </span>
+      <h2 className="text-[15px] font-semibold tracking-tight text-slate-900">{title}</h2>
+      {count !== undefined && (
+        <span className="rounded-full bg-slate-100 px-2 text-[11px] font-medium tabular-nums text-slate-500">{count}</span>
+      )}
+      {right && <span className="ml-auto">{right}</span>}
+    </header>
+  )
+}
+
+/** Icon paths for card headers, one visual language across the app. */
+export const GLYPH: Record<string, ReactNode> = {
+  client_overview: <path d="M3.5 16.5v-11l6-3v14M9.5 16.5v-8l7 2.5v5.5M2 16.5h16M6 8h1M6 11h1M12.5 12h1" />,
+  changes_since_last: <path d="M16 10a6 6 0 1 1-1.8-4.3M16 4v3.5h-3.5" />,
+  asks_commitments: <path d="M4 15.5V5.5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7.5L4 15.5ZM7.5 7.5h5M7.5 10h3" />,
+  key_metrics: <path d="M3 14.5 7.5 10l3 3L17 6.5M12.5 6.5H17V11" />,
+  opportunities: <path d="M10 17a7 7 0 1 0 0-14 7 7 0 0 0 0 14Zm0-3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm0-3.5h.01" />,
+  news_events: <path d="M4 4.5h10v11H5.5A1.5 1.5 0 0 1 4 14V4.5ZM14 7.5h2v6.5a1.5 1.5 0 0 1-3 0M6.5 7.5h5M6.5 10h5M6.5 12.5h3" />,
+  uncertainty: <path d="M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0ZM8 8a2 2 0 1 1 2.8 1.8c-.5.2-.8.7-.8 1.2v.5M10 14h.01" />,
+  actions: <path d="M8 5.5h9M8 10h9M8 14.5h9M3.5 5.5l1 1 1.75-2M3.5 10l1 1 1.75-2M3.5 14.5l1 1 1.75-2" />,
+  conflicts: <path d="M7 4 3.5 7.5 7 11M3.5 7.5h10M13 9l3.5 3.5L13 16m3.5-3.5h-10" />,
+  gaps: <path d="M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0ZM8 8a2 2 0 1 1 2.8 1.8c-.5.2-.8.7-.8 1.2v.5M10 14h.01" />,
+  meetings: <path d="M3.5 6.5h13v10h-13zM3.5 9.5h13M7 3.5v3M13 3.5v3" />,
+  companies: <path d="M3.5 16.5v-11l6-3v14M9.5 16.5v-8l7 2.5v5.5M2 16.5h16M6 8h1M6 11h1M12.5 12h1" />,
+  facilities: <path d="M5.5 2.5h6.5l3.5 3.5v11.5h-10zM12 2.5V6h3.5M8 10h5M8 13h5" />,
+}
+
 export function PanelTitle({ children, count }: { children: ReactNode; count?: number }) {
   return (
     <h3 className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">

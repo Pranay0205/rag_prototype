@@ -286,7 +286,7 @@ function DocumentView({ doc, citation }: { doc: SourceDoc; citation: Citation })
         </Property>
         <Property label="Linked to client">
           {doc.link_method === 'inferred' ? (
-            <Pill className="bg-violet-50 text-violet-700 ring-violet-200">
+            <Pill className="bg-indigo-50 text-indigo-700 ring-indigo-200">
               By name, {Math.round(doc.link_confidence * 100)}% confidence
             </Pill>
           ) : (

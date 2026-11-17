@@ -2,7 +2,7 @@
 // call, so the page has real numbers within a second. Click a card to open the rows behind it.
 import { useEffect, useId, useState, type ReactNode } from 'react'
 import type { Citation, KeyFigure } from '../types'
-import { cn } from './ui'
+import { CARD, cn } from './ui'
 
 interface Props {
   figures: KeyFigure[]
@@ -58,7 +58,7 @@ function FigureCard({ figure, index, onCite }: { figure: KeyFigure; index: numbe
       disabled={!first}
       title={first ? 'Open the database rows behind this number' : undefined}
       style={{ animationDelay: `${index * 70}ms` }}
-      className="rise group relative flex min-h-[118px] flex-col overflow-hidden rounded-2xl bg-white p-4 text-left shadow-[0_1px_2px_rgba(15,23,42,0.03)] ring-1 ring-slate-900/[0.05] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_12px_32px_-12px_rgba(79,70,229,0.25)] hover:ring-indigo-200"
+      className={cn(CARD, 'rise group relative flex min-h-[118px] flex-col overflow-hidden p-4 text-left transition duration-300 hover:-translate-y-0.5 hover:ring-indigo-200')}
     >
       <div className="flex items-center gap-2">
         <span className={cn('grid h-6 w-6 shrink-0 place-items-center rounded-lg', tone.soft)}>
