@@ -332,6 +332,137 @@ def load_documents(conn, resolver: EntityResolver, merge_map: dict, report: dict
     }
 
 
+# ---------------------------------------------------------------- ING-12 quality checks
+
+
+def _quality_checks(conn) -> list[tuple[str, str, str, str]]:
+    """(id, plain-language check, severity, SQL returning the failing rows). Errors are data that is
+    wrong; warnings are gaps the app reports instead of filling (P4: fail visibly); info lists rows
+    held out on purpose (e.g. news about a look-alike company, ING-3)."""
+    from briefing.tools import _last_quarters  # reuse the TTM window definition (TOOL-6)
+
+    owned = [
+        (t, key)
+        for t, key in [
+            ("contacts", "contact_id"),
+            ("coverage", "user_id"),
+            ("financials", "fiscal_period"),
+            ("holdings", "holding_id"),
+            ("revenue", "period"),
+            ("interactions", "interaction_id"),
+            ("meetings", "meeting_id"),
+            ("open_actions", "action_id"),
+            ("opportunities", "opp_id"),
+            ("service_issues", "issue_id"),
+            ("client_aliases", "alias"),
+        ]
+    ]
+    orphans = "\nUNION ALL ".join(
+        f"SELECT '{t}' AS table_name, {key} AS record, client_id FROM {t} "
+        "WHERE client_id NOT IN (SELECT client_id FROM clients)"
+        for t, key in owned
+    )
+    quarters = ",".join(f"'{q}'" for q in _last_quarters(config.TODAY, 8))
+    return [
+        ("Q1", "Every record belongs to a known client", "error", orphans),
+        (
+            "Q2",
+            "One client per LEI (duplicates merged)",
+            "error",
+            "SELECT lei, COUNT(*) AS clients FROM clients GROUP BY lei HAVING COUNT(*) > 1",
+        ),
+        # per original record: after a merge, two records' rows for one quarter are both real
+        # (Helios's green loan was booked under C-007) and are added, not de-duplicated
+        (
+            "Q3",
+            "Each original client record reports a quarter and product line once",
+            "error",
+            "SELECT source_client_id, period, product_line, COUNT(*) AS rows FROM revenue\n"
+            "GROUP BY source_client_id, period, product_line HAVING COUNT(*) > 1",
+        ),
+        (
+            "Q4",
+            "Revenue is never negative",
+            "error",
+            "SELECT client_id, period, product_line, revenue_usd FROM revenue WHERE revenue_usd < 0",
+        ),
+        (
+            "Q5",
+            "Every client has one primary banker",
+            "error",
+            "SELECT c.client_id, COUNT(v.user_id) AS primary_bankers FROM clients c\n"
+            "LEFT JOIN coverage v ON v.client_id = c.client_id AND v.is_primary = 1\n"
+            "GROUP BY c.client_id HAVING COUNT(v.user_id) <> 1",
+        ),
+        (
+            "Q6",
+            "Owners and bankers are known users",
+            "error",
+            "SELECT 'open_actions' AS table_name, action_id AS record, owner AS user_id FROM open_actions\n"
+            "WHERE owner NOT IN (SELECT user_id FROM users)\n"
+            "UNION ALL SELECT 'coverage', client_id, user_id FROM coverage\n"
+            "WHERE user_id NOT IN (SELECT user_id FROM users)",
+        ),
+        (
+            "Q7",
+            "Facilities mature after they open",
+            "error",
+            "SELECT holding_id, opened_date, maturity_date FROM holdings\n"
+            "WHERE maturity_date IS NOT NULL AND maturity_date < opened_date",
+        ),
+        (
+            "Q8",
+            "Contacts leave after they join",
+            "error",
+            "SELECT contact_id, start_date, end_date FROM contacts\n"
+            "WHERE end_date IS NOT NULL AND end_date < start_date",
+        ),
+        (
+            "Q9",
+            "Win probabilities are between 0 and 100",
+            "error",
+            "SELECT opp_id, probability_pct FROM opportunities WHERE probability_pct NOT BETWEEN 0 AND 100",
+        ),
+        (
+            "Q10",
+            "Every client has revenue for the last 8 quarters",
+            "warning",
+            "SELECT c.client_id, COUNT(DISTINCT r.period) AS quarters_present FROM clients c\n"
+            f"LEFT JOIN revenue r ON r.client_id = c.client_id AND r.period IN ({quarters})\n"
+            "GROUP BY c.client_id HAVING COUNT(DISTINCT r.period) < 8",
+        ),
+        (
+            "Q11",
+            "Documents that match no client are held out of briefings",
+            "info",
+            "SELECT doc_id, doc_type, link_method FROM documents\n"
+            "WHERE client_id IS NULL AND doc_type NOT IN ('research', 'product_update')\n"
+            "AND quarantined = 0 AND duplicate_of IS NULL",
+        ),
+    ]
+
+
+def check_quality(conn, report: dict) -> None:
+    """ING-12: run each check (a SQL query that returns the failing rows) on the unified data and
+    record the outcome in the ingestion report. Nothing is fixed or hidden here: errors and gaps are
+    reported so the data page and the briefing can show them."""
+    results = []
+    for qid, check, severity, sql in _quality_checks(conn):
+        failing = [dict(r) for r in conn.execute(sql)]
+        results.append(
+            {
+                "id": qid,
+                "check": check,
+                "severity": severity,
+                "passed": not failing,
+                "failures": len(failing),
+                "examples": failing[:5],
+                "sql": sql,
+            }
+        )
+    report["quality_checks"] = results
+
+
 # ---------------------------------------------------------------- ING-10 index
 
 
@@ -387,6 +518,7 @@ def run(
         merge_map = merge_clients(conn, report)
         resolver = EntityResolver.from_db(conn)
         load_documents(conn, resolver, merge_map, report)
+        check_quality(conn, report)
         if with_index:
             build_index(conn, report)
         report["chunks_total"] = conn.execute("SELECT COUNT(*) FROM chunks").fetchone()[0]

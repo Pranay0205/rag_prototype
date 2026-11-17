@@ -25,6 +25,20 @@ def doc(conn, doc_id):
     return rows(conn, "SELECT * FROM documents WHERE doc_id=?", (doc_id,))[0]
 
 
+def test_ING_12_quality_checks(conn):
+    report: dict = {}
+    ingest.check_quality(conn, report)
+    checks = {c["id"]: c for c in report["quality_checks"]}
+    assert all(c["passed"] for c in checks.values() if c["severity"] == "error")
+    # gaps are reported, never filled: Cascade has no Q3 2026 revenue
+    assert not checks["Q10"]["passed"] and checks["Q10"]["examples"] == [
+        {"client_id": "C-003", "quarters_present": 7}
+    ]
+    # the look-alike company's news is held out on purpose
+    assert [e["doc_id"] for e in checks["Q11"]["examples"]] == ["news_ca_002"]
+    assert all(c["sql"].lstrip().upper().startswith("SELECT") for c in checks.values())
+
+
 def test_ING_2_lei_merge(conn):
     merges = rows(conn, "SELECT merged_id, survivor_id FROM client_merge")
     assert merges == [{"merged_id": "C-007", "survivor_id": "C-002"}]

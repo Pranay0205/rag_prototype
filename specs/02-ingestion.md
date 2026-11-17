@@ -68,7 +68,21 @@ query embeddings batched per briefing. Measured: ~6.6 s to embed 120 chunks (one
 
 **ING-11 Ingestion report.** JSON with counts (rows per table, docs, chunks), merges,
 links by method, unresolved/ambiguous docs, duplicates, quarantined news, injection flags.
-Shown in the UI's data-health panel.
+Shown on the data page (UI-15).
+
+**ING-12 Quality checks.** After unification, run checks on the data. Each check is a SQL query
+that returns the rows breaking it, with a severity:
+- **error:** the data is wrong. Examples: a record for an unknown client, two clients with one LEI,
+  an original record reporting a quarter and product line twice, negative revenue, no primary banker
+  or more than one, an unknown owner, a facility maturing before it opens, a contact leaving before
+  joining, a probability outside 0 to 100.
+- **warning:** a gap the app reports instead of filling, such as a client missing one of the last 8
+  revenue quarters.
+- **info:** rows held out on purpose, such as news about a look-alike company.
+
+Results (pass, failure count, up to 5 failing rows, the SQL) go in the ingestion report. Nothing is
+fixed or hidden. After a merge, two records' rows for the same quarter are both real (Helios's green
+loan was booked under C-007), so uniqueness is checked per original record (`source_client_id`).
 
 ## Tests (pytest, `tests/test_ingestion.py`)
 
