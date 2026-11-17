@@ -835,8 +835,9 @@ def _context(tools: Tools, viewer: Viewer, facts: FactSheet) -> tuple[dict, dict
 
 
 ASK_GUIDANCE = (
-    "Answer the banker's question directly in 1 to 4 claims. If the evidence does not answer it, "
-    "add an unknown saying what is missing instead of writing a claim."
+    "Answer the banker's question directly in at most 3 claims, most important first. Each claim "
+    "states ONE fact from ONE or two evidence items; do not chain facts with 'and' or 'since'. "
+    "If the evidence does not answer it, add an unknown saying what is missing instead of writing a claim."
 )
 
 
