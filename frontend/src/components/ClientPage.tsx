@@ -16,6 +16,8 @@ interface Props {
   onAsk: (clientId: string) => void
 }
 
+const DOCS_SHOWN = 5 // most recent first; the rest behind "Show all"
+
 const STAGE: Record<string, string> = {
   mandated: 'bg-emerald-50 text-emerald-800',
   proposal_pending: 'bg-indigo-50 text-indigo-700',
@@ -27,6 +29,7 @@ const STAGE: Record<string, string> = {
 export function ClientPage({ clientId, userId, onCite, onOpenMeeting, onAsk }: Props) {
   const [data, setData] = useState<ClientOverview | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [allDocs, setAllDocs] = useState(false)
 
   useEffect(() => {
     setData(null)
@@ -332,14 +335,13 @@ export function ClientPage({ clientId, userId, onCite, onOpenMeeting, onAsk }: P
 
           <Panel title="Documents" note={`${data.documents.length} you can see`}>
             <ul>
-              {data.documents.map((d) => (
+              {(allDocs ? data.documents : data.documents.slice(0, DOCS_SHOWN)).map((d) => (
                 <Row key={d.doc_id} onClick={() => d.citation && onCite(d.citation)}>
                   {d.citation && <SourceKindIcon citation={d.citation} className="h-4 w-4" />}
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[14px] font-medium">{d.title}</span>
                     <span className="block text-[12px] text-slate-500">
                       {d.doc_type.replace(/_/g, ' ')} · {readable(d.date)}
-                      {d.derived ? ' · prior briefing' : ''}
                       {d.link_method === 'inferred' ? ' · linked by name' : ''}
                     </span>
                   </span>
@@ -351,6 +353,14 @@ export function ClientPage({ clientId, userId, onCite, onOpenMeeting, onAsk }: P
                 </Row>
               ))}
             </ul>
+            {data.documents.length > DOCS_SHOWN && (
+              <button
+                onClick={() => setAllDocs(!allDocs)}
+                className="mt-1 border-t border-slate-100 pt-3 text-[13px] font-medium text-slate-600 hover:text-slate-900"
+              >
+                {allDocs ? 'Show fewer' : `Show all ${data.documents.length}`}
+              </button>
+            )}
           </Panel>
         </div>
       </div>
