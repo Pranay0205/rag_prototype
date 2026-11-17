@@ -1,9 +1,19 @@
 # Architecture
 
+## At a glance
+
+![Briefing Desk components: from client data to a cited answer](images/overview.png)
+
+The path of every answer. Code reads the data, applies access control and computes every figure. The
+model writes from the evidence it is given. A second pass checks each claim: code first (IDs, numbers,
+quotes), then an LLM judge (does the source support it?).
+
+## In detail
+
 ![Briefing Desk architecture](images/architecture.png)
 
-<sub>Source: [`images/architecture.html`](images/architecture.html), rendered to PNG. The diagrams below are
-Mermaid, so they render on GitHub and stay editable as text.</sub>
+<sub>Sources: [`images/overview.html`](images/overview.html) and [`images/architecture.html`](images/architecture.html),
+rendered to PNG. The diagrams below are Mermaid, so they render on GitHub and stay editable as text.</sub>
 
 The [design walkthrough](DESIGN.md) explains *why*; this page shows *what runs where*. Requirement
 IDs point into [`specs/`](../specs/00-overview.md).

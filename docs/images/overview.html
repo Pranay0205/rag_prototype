@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Briefing Desk components</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f6f5f2; --card: #ffffff; --ink: #1a1814; --muted: #5f5a52; --line: #d9d5cc;
+    --teal: #0f9488; --teal-bg: #e6f6f4; --amber: #b45309; --amber-bg: #fdf6e7; --stone: #8a8378;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); font-family: Inter, system-ui, sans-serif; color: var(--ink); width: 1600px; padding: 56px 64px 64px; }
+  h1 { font-size: 34px; letter-spacing: -0.02em; }
+  .sub { margin-top: 8px; font-size: 17px; color: var(--muted); }
+  .legend { display: flex; gap: 26px; margin-top: 18px; font-size: 14px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 8px; }
+  .sw { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
+
+  .flow { display: grid; grid-template-columns: repeat(8, 1fr); gap: 30px; margin-top: 44px; position: relative; }
+  .box { background: var(--card); border: 1px solid #e7e3db; border-top: 4px solid var(--ink); border-radius: 14px; padding: 18px 16px; min-height: 148px; position: relative; }
+  .box h2 { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+  .box p { margin-top: 8px; font-size: 13.5px; line-height: 1.45; color: var(--muted); }
+  .tag { position: absolute; top: -13px; left: 14px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; background: var(--bg); padding: 0 6px; color: var(--stone); }
+  .box + .box::before { content: "→"; position: absolute; left: -26px; top: 58px; font-size: 22px; color: var(--stone); }
+  .store { border-top-color: var(--stone); }
+  .gate { border: 2px dashed var(--amber); border-top: 4px solid var(--amber); background: var(--amber-bg); }
+  .gate h2 { color: var(--amber); }
+  .gate p { color: #7c4a12; }
+  .ui { border-top-color: var(--ink); }
+
+  .box.llm { background: var(--teal-bg); border-color: #b7e3dd; border-top-color: var(--teal); }
+  .box.llm h2 { color: #0b6b62; }
+  .box.llm p { color: #23544f; }
+  .eval { margin-top: 30px; background: var(--card); border: 1px solid #e7e3db; border-radius: 14px; padding: 16px 20px; display: flex; gap: 18px; align-items: baseline; }
+  .eval h2 { font-size: 16px; white-space: nowrap; }
+  .eval p { font-size: 13.5px; color: var(--muted); }
+</style>
+</head>
+<body>
+  <h1>Briefing Desk: components</h1>
+  <p class="sub">How an answer is made. Code fetches, computes and decides access. The model writes from cleared evidence, and a second check (code, then an LLM judge) verifies every claim.</p>
+  <div class="legend">
+    <span><i class="sw" style="background:var(--ink)"></i>Code</span>
+    <span><i class="sw" style="background:var(--stone)"></i>Storage</span>
+    <span><i class="sw" style="background:var(--amber)"></i>Access control boundary</span>
+    <span><i class="sw" style="background:var(--teal)"></i>LLM</span>
+  </div>
+
+  <div class="flow">
+    <div class="box"><span class="tag">Sources</span><h2>Client data</h2><p>13 tables (CRM, revenue, holdings) and 31 documents (emails, notes, news).</p></div>
+    <div class="box"><span class="tag">Ingestion</span><h2>Unify and check</h2><p>Merge duplicates, match names, link documents, screen text, run quality checks.</p></div>
+    <div class="box store"><span class="tag">Store</span><h2>One database</h2><p>Clean tables plus a keyword and meaning search index.</p></div>
+    <div class="box gate"><span class="tag">Access</span><h2>Typed tools</h2><p>The only way to read data. Coverage and clearance checked before anything returns.</p></div>
+    <div class="box"><span class="tag">Evidence</span><h2>Evidence pack</h2><p>Facts and passages, numbered E1, E2... Figures computed by code.</p></div>
+    <div class="box llm"><span class="tag">LLM</span><h2>Writer</h2><p>Writes each claim citing evidence IDs. Never computes a number.</p></div>
+    <div class="box llm"><span class="tag">Code + LLM</span><h2>Checker and judge</h2><p>Code: IDs exist, numbers match, quotes found. LLM judge: does the source support it?</p></div>
+    <div class="box ui"><span class="tag">Banker</span><h2>Cited answer</h2><p>Each claim Verified or Check sources, one click from its source.</p></div>
+  </div>
+
+  <div class="eval"><h2>Evaluation harness</h2><p>Tests every layer before release: unit tests, 14 data traps, golden answers graded by a separate model, and a leak sweep across every user and client.</p></div>
+</body>
+</html>
