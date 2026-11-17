@@ -17,7 +17,7 @@ export function TopBar({ users, me, onHome, crumb, onSwitch, onSignOut }: Props)
   // z-30 keeps the profile menu above the page content
   return (
     <header className="relative z-30 shrink-0 border-b border-slate-200 bg-white">
-      <div className="mx-auto flex h-16 max-w-[1320px] items-center justify-between gap-4 px-6">
+      <div className="mx-auto flex h-16 max-w-[1320px] items-center min-[1600px]:max-w-[1640px] justify-between gap-4 px-6">
         <div className="flex min-w-0 items-center gap-4">
           <button onClick={onHome} className="flex items-center gap-2.5" title="Home">
             <Logo size={32} />

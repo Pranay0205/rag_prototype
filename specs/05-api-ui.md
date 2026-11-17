@@ -61,7 +61,9 @@ suspected injection). Structured sources show the database row itself (`Citation
 field table, named by table and record ID, with the sentence the model was given beneath it.
 
 **UI-5 Prep panel – "Needs attention":** one sticky panel beside the briefing with two tabs: To do
-(actions by urgency, access notice) and Conflicts (conflicts, then gaps). Every item shows where it came from (From records, From a conflict, Suggested by AI,
+(actions by urgency, access notice) and Conflicts (conflicts, then gaps). On screens 1600px and wider,
+a sticky index on the left lists key figures and the seven sections with confidence and verified
+counts, highlights the one on screen and scrolls to it on click. Every item shows where it came from (From records, From a conflict, Suggested by AI,
 From your notes, Added by you). Ticking saves an action and unticking removes it; "Add item" saves a
 typed one; saved actions reappear in the client's later briefings and ticked suggestions stay ticked; right: conflicts and gaps. Originally one right rail: conflicts (both values side by side + resolution),
 unknowns, `access_limited` notice ("Some sources are not available at your access level"),

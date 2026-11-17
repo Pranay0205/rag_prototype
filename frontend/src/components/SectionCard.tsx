@@ -17,6 +17,7 @@ const REASONS: { key: RejectReason; label: string; icon: ReactNode }[] = [
 
 interface Props {
   title: string
+  anchor?: string // id for the briefing index to scroll to
   exhibit?: ReactNode // ORC-14 structured view, shown above the claims as soon as it arrives
   section?: Section
   reviews: Record<string, Review>
@@ -24,10 +25,10 @@ interface Props {
   onCite: (citation: Citation) => void
 }
 
-export function SectionCard({ title, exhibit, section, reviews, onReview, onCite }: Props) {
+export function SectionCard({ title, anchor, exhibit, section, reviews, onReview, onCite }: Props) {
   const verified = section?.claims.filter((c) => c.status === 'verified').length ?? 0
   return (
-    <section className={cn(CARD, 'px-6 pb-2 pt-1')}>
+    <section id={anchor} className={cn(CARD, 'scroll-mt-6 px-6 pb-2 pt-1')}>
       <div className="flex flex-wrap items-center justify-between gap-3 py-4">
         <h2 className="text-[18px] font-semibold tracking-tight text-slate-900">{title}</h2>
         {section && <VerifiedPill confidence={section.confidence} verified={verified} total={section.claims.length} />}

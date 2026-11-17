@@ -5,6 +5,7 @@ import { AttentionPanel, originOf, type ActionState } from './components/Attenti
 import { ChatWidget } from './components/ChatWidget'
 import { HistoryMenu } from './components/HistoryMenu'
 import { ContactsExhibit, PipelineExhibit, RevenueExhibit } from './components/Exhibits'
+import { BriefingIndex, FIGURES_ANCHOR } from './components/BriefingIndex'
 import { HomeDashboard } from './components/HomeDashboard'
 import { KeyFigures } from './components/KeyFigures'
 import { NotesCapture } from './components/NotesCapture'
@@ -338,9 +339,15 @@ export default function App() {
           <div
             className={cn(
               'mx-auto px-6 py-8',
-              rails ? 'flex max-w-[1320px] flex-wrap items-start gap-8' : 'max-w-3xl',
+              rails ? 'flex max-w-[1320px] flex-wrap items-start gap-8 min-[1600px]:max-w-[1640px]' : 'max-w-3xl',
             )}
           >
+            {rails && (
+              // wide screens only: an index of the briefing in the otherwise empty left margin
+              <div className="hidden w-[210px] shrink-0 min-[1600px]:sticky min-[1600px]:top-6 min-[1600px]:block">
+                <BriefingIndex sections={run.sections} />
+              </div>
+            )}
             <main className="min-w-0 flex-[999_1_600px]">
               <MeetingHeader
                 meeting={meeting}
@@ -367,11 +374,14 @@ export default function App() {
                   {run.status === 'idle' && <IdleState onPrepare={prepare} />}
                   {run.status !== 'idle' && (
                     <div className="space-y-6">
-                      <KeyFigures figures={run.figures} loading={run.status === 'running'} onCite={setDrawer} />
+                      <div id={FIGURES_ANCHOR} className="scroll-mt-6">
+                        <KeyFigures figures={run.figures} loading={run.status === 'running'} onCite={setDrawer} />
+                      </div>
                       {SECTION_ORDER.map((s) => (
                         <SectionCard
                           key={s.key}
                           title={s.title}
+                          anchor={s.key}
                           exhibit={
                             s.key === 'client_overview' ? (
                               <ContactsExhibit exhibits={run.exhibits} onCite={setDrawer} />
