@@ -572,6 +572,12 @@ def home(user_id: str):
                 "revenue_ttm": total.get("current_ttm"),
                 "yoy_pct": total.get("yoy_pct"),
                 "next_meeting_id": next((m["meeting_id"] for m in meetings if m["client_id"] == cid), None),
+                # people who joined since the recent-change cut-off, e.g. a new CFO ("before you go in")
+                "new_contacts": [
+                    {"name": k["name"], "title": k["title"], "since": k["start_date"]}
+                    for k in p["contacts"]
+                    if k["is_active"] and k["changed_recently"]
+                ],
                 "last_prepared": saved.get(cid),
             }
         )

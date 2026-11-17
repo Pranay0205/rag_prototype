@@ -244,6 +244,7 @@ def test_API_15_home_respects_coverage(client):
     alex = client.get("/api/home", params={"user_id": "alex"}).json()
     nw = next(c for c in alex["companies"] if c["client_id"] == "C-001")
     assert nw["revenue_ttm"] == 3400000 and nw["yoy_pct"] == -18.1
+    assert [c["name"] for c in nw["new_contacts"]] == ["Raj Menon"]  # the new CFO
     assert alex["facilities"][0]["product"] == "Revolving Credit Facility"  # soonest maturity first
 
 
