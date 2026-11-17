@@ -35,11 +35,12 @@ SNIPPET = 300  # characters of each source shown to the planner
 OBSERVATIONS = 12_000  # characters of observations the planner sees in total
 
 ToolName = Literal[
-    "list_clients", "products_held", "revenue", "pipeline", "people", "interactions", "documents"
+    "list_clients", "meetings", "products_held", "revenue", "pipeline", "people", "interactions", "documents"
 ]
 
 LABELS = {
     "list_clients": "Client list",
+    "meetings": "Upcoming meetings",
     "products_held": "Products held",
     "revenue": "Revenue",
     "pipeline": "Pipeline and actions",
@@ -50,9 +51,12 @@ LABELS = {
 
 AGENT_GUIDANCE = (
     "Answer the banker's question across the clients in the evidence. Each evidence title starts with "
-    "its client's name; name the client in every claim. At most 3 claims, most important first, each "
-    "stating ONE fact. If the evidence does not answer it, add an unknown instead of a claim. If the "
-    "question asks what a term means, explain it in `explanation`: at most 2 plain sentences, no numbers."
+    "its client's name; name the client in every claim. Write only about the clients that match; "
+    "never write about clients that do not (the answer already shows which clients were checked). "
+    "Asked how many, lead with the count from a summary source. "
+    "At most 3 claims, most important first, each stating ONE fact. If the evidence does not answer "
+    "it, add an unknown instead of a claim. If the question asks what a term means, explain it in "
+    "`explanation`: at most 2 plain sentences, no numbers."
 )
 
 
@@ -106,8 +110,9 @@ def answer_across_clients(tools: Tools, user_id: str, question: str, client_hint
             names[cid] = p.data["client"]["short_name"] if p.ok else cid
         return names[cid]
 
-    def keep(cid: str, ev: Evidence) -> None:
-        ev.citation = ev.citation.model_copy(update={"title": f"{name_of(cid)}: {ev.citation.title}"})
+    def keep(cid: str | None, ev: Evidence) -> None:
+        owner = name_of(cid) if cid else "Your calendar"
+        ev.citation = ev.citation.model_copy(update={"title": f"{owner}: {ev.citation.title}"})
         evidence.setdefault(ev.citation.source_id, ev)
 
     for turn in range(1, MAX_STEPS + 1):
@@ -125,6 +130,13 @@ def answer_across_clients(tools: Tools, user_id: str, question: str, client_hint
             break
         if step.tool is None:
             break
+        if step.tool == "meetings":  # the viewer's calendar across covered clients; no IDs needed
+            r = tools.get_meetings(viewer)
+            for s in r.sources:
+                keep((s.record or {}).get("client_id"), Evidence("", s, "sql", s.snippet))
+            observations += [f"meetings: {s.snippet[:SNIPPET]}" for s in r.sources]
+            steps.append({"tool": "meetings", "label": LABELS["meetings"], "thought": step.thought})
+            continue
         if step.tool == "list_clients":
             for cid in sorted(tools._covered(viewer)):
                 p = tools.get_client_profile(viewer, cid)

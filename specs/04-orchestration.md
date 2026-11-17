@@ -128,12 +128,15 @@ Code also caps chat answers at 3 claims.
 
 **ORC-16 Agentic search** (`agent.py`). A question across every client the viewer covers ("Which
 client has a term loan?") is answered by a planner loop:
-- **Planning:** each turn the fast model picks ONE typed tool (list_clients, products_held, revenue,
-  pipeline, people, interactions, documents) and the client IDs to run it for, or stops.
+- **Planning:** each turn the fast model picks ONE typed tool (list_clients, meetings, products_held,
+  revenue, pipeline, people, interactions, documents) and the client IDs to run it for, or stops.
 - **Execution:** code runs the tools. Coverage and entitlements are enforced inside them (P3), so a
   client the model names but the viewer cannot see comes back refused, never as data. Refusals are
   reported to the planner, never worked around.
 - **Bounds:** at most 4 turns and 10 clients per turn. Observations are truncated.
+- **Absence and dates are facts from code:** holdings carry a complete-list summary and a "within 12
+  months" flag; meetings carry a "this week" flag and a count. So "no term loan", "within 12
+  months" and "3 meetings this week" are cited and verifiable.
 - **Answer:** everything gathered becomes evidence, titled with its client's name, for the normal
   writer and verifier (ORC-5, ORC-6). The answer is therefore cited and checked like any other, and
   capped at 3 claims.

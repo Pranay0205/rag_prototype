@@ -260,12 +260,36 @@ class Tools:
             for m in ms
             if m["client_id"] in covered and (client_id is None or m["client_id"] == self._cid(client_id))
         ]
+        week_end = (config.TODAY + timedelta(days=6 - config.TODAY.weekday())).isoformat()
         for m in ms:
             m["our_attendees"], m["client_attendees"] = (
                 jlist(m["our_attendees"]),
                 jlist(m["client_attendees"]),
             )
-        return ToolResult(ok=True, data=ms)
+            m["this_week"] = m["start_time"][:10] <= week_end
+        sources = [
+            _sql_source(
+                f"meetings/{m['meeting_id']}",
+                f"Meeting {m['meeting_id']}",
+                f"{m['start_time']}: {m['purpose']} with {', '.join(m['client_attendees'])} "
+                f"of {m['legal_name']}; our side: {', '.join(m['our_attendees'])}"
+                + (" (this week)" if m["this_week"] else ""),
+                m["start_time"][:10],
+                record=m,
+            )
+            for m in ms
+        ]
+        week = [m for m in ms if m["this_week"]]
+        sources.insert(
+            0,
+            _sql_source(
+                "meetings/summary",
+                "Upcoming meetings",
+                f"{len(ms)} upcoming meetings from {config.TODAY.isoformat()}; {len(week)} this week "
+                f"(to {week_end}): " + "; ".join(f"{m['start_time']} {m['legal_name']}" for m in week),
+            ),
+        )
+        return ToolResult(ok=True, data=ms, sources=sources)
 
     # ------------------------------------------------------------ TOOL-15
 
@@ -538,6 +562,7 @@ class Tools:
                 + (f", {_usd(h['notional_usd'])}" if h["notional_usd"] else "")
                 + f", opened {h['opened_date']}"
                 + (f", matures {h['maturity_date']}" if h["maturity_date"] else "")
+                + (" (within 12 months)" if h["matures_within_12m"] else "")  # computed by code (TOOL-7)
                 + (f". {h['notes']}" if h["notes"] else ""),
                 h["opened_date"],
                 record=h,
@@ -549,6 +574,7 @@ class Tools:
         listed = "; ".join(
             h["product"]
             + (f" ({_usd(h['notional_usd'])}, matures {h['maturity_date']})" if h["notional_usd"] else "")
+            + (" (within 12 months)" if h["matures_within_12m"] else "")
             for h in hs
         )
         summary = (

@@ -112,6 +112,7 @@ observations already answer the question or no tool would help.
 
 Tools:
 - list_clients: the clients this banker covers, with their IDs. Call it first unless IDs are known.
+- meetings: upcoming meetings across all their clients, with this week marked. No client IDs.
 - products_held: products and credit facilities held, with size and maturity.
 - revenue: relationship revenue for the last 12 months, the change, and by product line.
 - pipeline: open opportunities, service issues, and open actions with overdue flags.
