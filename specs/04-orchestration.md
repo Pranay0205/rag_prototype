@@ -116,6 +116,16 @@ then [E5]"), and must come from an overdue commitment, a deadline, a request, an
 recent change. The judge checks that the stated reason is in the evidence, not whether the advice is
 wise.
 
+Questions about what a term means are answered in two ways:
+- **The app's own labels** ("What is Facilities & maturities?", "What does Check sources mean?"):
+  code matches them against the hand-written `glossary.yaml` and answers exactly and instantly,
+  with no model involved. Shown as "From the Briefing Desk guide".
+- **General business terms** ("What does TTM mean?"): the model may add an `explanation` of at most
+  2 sentences, shown as "General explanation, not from client records". Code drops any explanation
+  containing a digit (P1). Any client facts follow as normal cited claims.
+
+Code also caps chat answers at 3 claims.
+
 **ORC-14 Exhibits.** Structured views built by code from the same tool results and shown inside
 the section they answer: contacts with meeting attendance and new / former status (Client
 overview), our coverage team, revenue by product line prior vs current (Key metrics) and the

@@ -268,6 +268,14 @@ function Answer({ turn: t, onCite }: { turn: Turn; onCite: (c: Citation) => void
   const verified = claims.filter((c) => c.status === 'verified').length
   return (
     <div className="max-w-[92%] space-y-2.5 rounded-[20px] rounded-bl-md bg-slate-50 px-4 py-3 ring-1 ring-slate-200/70">
+      {t.answer.explanation && (
+        <div>
+          <p className="text-[13.5px] leading-relaxed text-slate-700">{t.answer.explanation}</p>
+          <p className="mt-1 text-[11.5px] text-slate-400">
+            {t.answer.explanation_source === 'glossary' ? 'From the Briefing Desk guide' : 'General explanation, not from client records'}
+          </p>
+        </div>
+      )}
       {claims.map((c) => (
         <div key={c.id} className="group/claim">
           <p className="text-[13.5px] leading-relaxed text-slate-700">
@@ -280,10 +288,10 @@ function Answer({ turn: t, onCite }: { turn: Turn; onCite: (c: Citation) => void
           <span className="font-medium text-slate-600">Not in the data:</span> {readable(u.question)}
         </p>
       ))}
-      {claims.length === 0 && t.answer.unknowns.length === 0 && (
+      {claims.length === 0 && t.answer.unknowns.length === 0 && !t.answer.explanation && (
         <p className="text-[13px] text-slate-500">Nothing in the sources answers this.</p>
       )}
-      <p className={cn('border-t border-slate-100 pt-2 text-[11px] text-slate-400')}>
+      <p className={cn('border-t border-slate-100 pt-2 text-[11px] text-slate-400', claims.length === 0 && t.answer.explanation && 'hidden')}>
         {claims.length > 0 && `${verified}/${claims.length} verified · `}
         {t.seconds !== undefined && `${t.seconds.toFixed(1)}s`}
         {t.answer.access_limited && ' · some sources restricted for your profile'}

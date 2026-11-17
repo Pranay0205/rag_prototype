@@ -15,9 +15,12 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from functools import cache
+from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel
+import yaml
+from pydantic import BaseModel, Field
 from rapidfuzz import fuzz
 
 from briefing import config, llm, prompts
@@ -98,6 +101,9 @@ class SectionDraft(BaseModel):
     conflicts: list[DraftConflict] = []
     unknowns: list[DraftUnknown] = []
     follow_ups: list[DraftFollowUp] = []  # asks_commitments only: requests not yet tracked
+    explanation: str | None = Field(
+        None, description="Ask only: a plain explanation of a term or part of the app, when asked; else null"
+    )
 
 
 class Verdict(BaseModel):
@@ -838,6 +844,9 @@ ASK_GUIDANCE = (
     "Answer the banker's question directly in at most 3 claims, most important first. Each claim "
     "states ONE fact from ONE or two evidence items; do not chain facts with 'and' or 'since'. "
     "If the evidence does not answer it, add an unknown saying what is missing instead of writing a claim."
+    " If the question asks what a term, metric or part of the app means, explain it in `explanation`: "
+    "at most 2 plain sentences, no numbers, no facts about this client. Add claims only if this "
+    "client's evidence adds something useful."
 )
 # ORC-15: questions asking what to do get actions, each tied to the cited fact that calls for it
 ASK_ACTION_GUIDANCE = (
@@ -847,11 +856,51 @@ ASK_ACTION_GUIDANCE = (
     "then to keep Meridian in the selection [E5].' Only actions that follow from an overdue "
     "commitment, a deadline, a client request, an open issue or a recent change in the evidence; "
     "no generic advice. If the evidence gives nothing to act on, add an unknown instead."
+    " If the question asks what a term, metric or part of the app means, explain it in `explanation`: "
+    "at most 2 plain sentences, no numbers, no facts about this client. Add claims only if this "
+    "client's evidence adds something useful."
 )
 _ACTION_QUESTION = re.compile(
     r"\b(prepare|prep|should (i|we)|what to (do|raise|bring|ask)|next steps?|recommend|focus on|priorit)",
     re.IGNORECASE,
 )
+
+
+def _norm(text: str) -> str:
+    """'Facilities & Maturities?' -> 'facilities and maturities'"""
+    return " ".join(re.sub(r"[^a-z0-9 ]+", " ", text.lower().replace("&", " and ")).split())
+
+
+@cache
+def _glossary() -> dict[str, tuple[str, str]]:
+    """Every way of writing an app label -> (label, hand-written definition). glossary.yaml."""
+    entries = yaml.safe_load(Path(__file__).with_name("glossary.yaml").read_text())
+    return {
+        _norm(name): (label, " ".join(e["text"].split()))
+        for label, e in entries.items()
+        for name in [label, *e.get("also", [])]
+    }
+
+
+_DEFINE = re.compile(
+    r"^(?:what s|what is|what are|what does|what do|define|explain|what is the meaning of|meaning of)"
+    r"\s+(?:the |a |an )?(.+?)(?:\s+(?:mean|means|stand for|stands for))?$"
+)
+
+
+def glossary_answer(question: str) -> tuple[str, str] | None:
+    """ORC-15: 'What is X?' where X is exactly one of the app's labels -> (label, definition),
+    answered from the hand-written glossary, not the model. Anything more ('What facilities does
+    Northwind have?') goes through the normal pipeline."""
+    m = _DEFINE.match(_norm(question))
+    return _glossary().get(m.group(1)) if m else None
+
+
+def _explanation(text: str | None) -> str | None:
+    """ORC-15: an uncited explanation of a term is shown only if it states no figures. Numbers come
+    from SQL (P1), so an explanation containing a digit is dropped rather than shown unchecked."""
+    text = " ".join((text or "").split())
+    return text if text and not re.search(r"\d", text) else None
 
 
 def answer_question(tools: Tools, user_id: str, client_id: str, question: str) -> dict:
@@ -865,6 +914,17 @@ def answer_question(tools: Tools, user_id: str, client_id: str, question: str) -
     question = " ".join(question.split())[:500]
     if not question:
         raise BriefingError("INVALID_INPUT", "Ask a question")
+    if term := glossary_answer(question):  # an app label: exact, instant, no client data
+        return {
+            "ask_id": f"ask-glossary-{uuid.uuid4().hex[:8]}",
+            "question": question,
+            "section": Section(key=SectionKey.ASK, title="Answer", confidence=Confidence.HIGH),
+            "conflicts": [],
+            "unknowns": [],
+            "explanation": term[1],
+            "explanation_source": "glossary",
+            "access_limited": False,
+        }
     facts = gather(tools, viewer, client_id)  # coverage enforced here (ORC-1)
     context, _ = _context(tools, viewer, facts)
     spec = SectionSpec(
@@ -881,6 +941,8 @@ def answer_question(tools: Tools, user_id: str, client_id: str, question: str) -
     section, conflicts, unknowns, _, trace = run_section(spec, evidence, context)
     section.warnings += warnings
     trace["dropped_for_budget"] = dropped
+    explanation = _explanation(trace["raw_output"].get("explanation"))
+    section.claims = section.claims[:3]  # the chat answers briefly, most important first
     ask_id = f"ask-{facts.profile['client']['client_id']}-{uuid.uuid4().hex[:8]}"
     runs = config.VAR_DIR / "runs"
     runs.mkdir(parents=True, exist_ok=True)
@@ -897,6 +959,8 @@ def answer_question(tools: Tools, user_id: str, client_id: str, question: str) -
         "section": section,
         "conflicts": conflicts,
         "unknowns": unknowns,
+        "explanation": explanation,  # labelled in the UI as general, not from client records
+        "explanation_source": "model" if explanation else None,
         "access_limited": limited or facts.access_limited,
     }
 

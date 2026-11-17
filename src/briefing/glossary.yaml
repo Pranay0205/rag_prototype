@@ -1,0 +1,63 @@
+# ORC-15: what the app's own labels mean. Hand-written so the chat explains them exactly and
+# instantly, without a model guessing. Matched by code on "what is / what does ... mean" questions.
+# Keys are the label; `also` lists other ways people write it.
+
+Facilities & maturities:
+  also: [facilities and maturities, facilities, maturities]
+  text: >-
+    The credit facilities a client holds, such as revolvers and term loans, with their size and
+    the date each one ends. Those maturing within the next 12 months are highlighted, because
+    each is the next refinancing conversation.
+
+Before you go in:
+  text: >-
+    The few things to know before your next meeting, picked by fixed rules rather than by AI: the
+    revenue trend, a facility maturing within 12 months, and key contacts who joined recently.
+
+Next up:
+  text: Your next client meeting, with its briefing ready to open or prepare.
+
+Key figures:
+  also: [key figure]
+  text: >-
+    The headline numbers at the top of a briefing. They come straight from the database, never
+    from the AI.
+
+Conflicts:
+  also: [conflict]
+  text: >-
+    Places where two sources disagree, such as an old briefing and a current system record. Both
+    sides are shown, with the one that is current marked, so you can confirm before the meeting.
+
+To do:
+  text: >-
+    Suggested actions for the meeting. Each shows where it came from: the records, a conflict or
+    an AI suggestion. Ticking one saves it to your actions and carries it into later briefings.
+
+Verified:
+  text: >-
+    Every part of the sentence was checked against the source it cites: the records exist, the
+    numbers match and the source supports what it says.
+
+Check sources:
+  text: >-
+    The sentence could not be fully confirmed against the source it cites, so open the source
+    before relying on it. It does not mean the sentence is wrong.
+
+Not in the data:
+  text: >-
+    Part of your question that this client's data does not answer. The app says so instead of
+    guessing.
+
+Data as of:
+  text: >-
+    When the data was last loaded, and the newest record from each source, so you can see if a
+    feed has stopped updating.
+
+TTM:
+  also: [trailing twelve months]
+  text: Trailing twelve months, the last four reported quarters added together.
+
+YoY:
+  also: [year on year, year over year]
+  text: Year on year, the change against the same period a year earlier.

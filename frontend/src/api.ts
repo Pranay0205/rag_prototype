@@ -163,6 +163,8 @@ export interface AskAnswer {
   section: Section
   conflicts: Conflict[]
   unknowns: Unknown[]
+  explanation: string | null // what a term means; general, not from client records
+  explanation_source: 'glossary' | 'model' | null // the app's own guide, or a labelled model explanation
   access_limited: boolean
 }
 

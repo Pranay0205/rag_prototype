@@ -4,7 +4,16 @@ import pytest
 
 from briefing import ingest, llm, orchestrator
 from briefing.db import connect
-from briefing.orchestrator import _ACTION_QUESTION, SECTIONS, Evidence, JudgeResult, SectionDraft, run_section
+from briefing.orchestrator import (
+    _ACTION_QUESTION,
+    SECTIONS,
+    Evidence,
+    JudgeResult,
+    SectionDraft,
+    _explanation,
+    glossary_answer,
+    run_section,
+)
 from briefing.schemas import Citation, ClaimStatus, SectionKey, SourceKind
 from briefing.tools import Tools
 
@@ -335,3 +344,14 @@ def test_ORC_15_action_questions_get_actions():
         assert _ACTION_QUESTION.search(q), q
     for q in ["Who is the new CFO?", "What is overdue?", "What changed since the last meeting?"]:
         assert not _ACTION_QUESTION.search(q), q
+
+
+def test_ORC_15_app_labels_answered_from_glossary():
+    assert glossary_answer("What is Facilities and maturities?")[0] == "Facilities & maturities"
+    assert "not be fully confirmed" in glossary_answer("What does Check sources mean?")[1]
+    assert glossary_answer("What facilities does Northwind have?") is None  # a data question
+
+
+def test_ORC_15_explanation_never_states_figures():
+    assert _explanation("TTM means trailing twelve months.") == "TTM means trailing twelve months."
+    assert _explanation("Revenue is usually about 3.4M.") is None  # numbers only from SQL (P1)
