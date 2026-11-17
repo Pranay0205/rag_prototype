@@ -98,7 +98,7 @@ function ClaimRow({
   const n = claim.citations.length
 
   return (
-    <li className="group flex gap-4 py-3.5">
+    <li className="group group/claim flex gap-4 py-3.5">
       <div className="min-w-0 flex-1">
         <p
           className={cn(
@@ -209,15 +209,21 @@ function ClaimRow({
 export function VerificationTag({ status }: { status: Claim['status'] }) {
   if (status === 'verified') {
     return (
+      // Quiet by default: the shield alone; the word slides out while the claim is hovered.
       <span
         title="Verified by the system: cited sources exist, numbers match the database, and the sources support the claim"
-        className="inline-flex items-center gap-1 text-[11.5px] font-medium text-emerald-600"
+        aria-label="Verified"
+        className="inline-flex items-center text-[11.5px] font-medium text-emerald-600"
       >
-        <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+        <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
           <path d="M10 2.5 16 5v4.5c0 3.7-2.6 6.9-6 8-3.4-1.1-6-4.3-6-8V5l6-2.5Z" strokeLinejoin="round" />
           <path d="m7.2 10 2 2 3.6-4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        Verified
+        <span className="grid grid-cols-[0fr] opacity-0 transition-[grid-template-columns,opacity] duration-300 ease-out group-hover/claim:grid-cols-[1fr] group-hover/claim:opacity-100 motion-reduce:transition-none">
+          <span className="overflow-hidden whitespace-nowrap pl-1" aria-hidden="true">
+            Verified
+          </span>
+        </span>
       </span>
     )
   }

@@ -275,7 +275,7 @@ function Answer({ turn: t, onCite }: { turn: Turn; onCite: (c: Citation) => void
   return (
     <div className="max-w-[92%] space-y-2.5 rounded-2xl rounded-bl-md bg-white px-3.5 py-3 ring-1 ring-slate-200/70">
       {claims.map((c) => (
-        <div key={c.id}>
+        <div key={c.id} className="group/claim">
           <p className="text-[13.5px] leading-relaxed text-slate-700">
             <ClaimText claim={c} onCite={onCite} />
           </p>
