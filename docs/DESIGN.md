@@ -21,6 +21,9 @@ Two properties matter more than fluency: **every statement must be traceable to 
 
 ## 2. End to end
 
+Detailed diagrams (components, request sequence, ingestion, access layers) are in
+[ARCHITECTURE.md](ARCHITECTURE.md).
+
 ```mermaid
 flowchart LR
   subgraph Sources
@@ -94,7 +97,7 @@ has to be read or written.**
 
 No text-to-SQL. The model never writes queries: it receives evidence that typed tools have already
 fetched and filtered. This removes a whole class of failure (wrong joins, unfiltered queries, access
-bypass) at the cost of flexibility, which the Ask tab recovers through retrieval instead of SQL.
+bypass) at the cost of flexibility, which the Ask chat recovers through retrieval instead of SQL.
 
 ## 5. Retrieval and the evidence pack
 
@@ -143,8 +146,8 @@ row: the model cannot drop an overdue commitment by choosing not to mention it.
 - **Enforced before retrieval** (P3), inside the tools, so restricted text never reaches the model's
   context. Prompting the model to keep secrets is not a control.
 - **No leaks by implication.** The briefing says only that "some sources are restricted for your
-  profile", never how many. Search reports that a name matches a client outside your coverage
-  without naming it. Deal-team membership is shown only to that deal team, because a deal team on
+  profile", never how many. The client-search API reports that a name matches a client outside
+  your coverage without naming it. Deal-team membership is shown only to that deal team, because a deal team on
   the coverage list reveals that a deal exists.
 - **No withholding either.** Measured in the eval: when a document carried a RESTRICTED label, or
   its text said "MNPI, coverage must not be informed", the model withheld it from Kim, who is cleared.
@@ -166,7 +169,8 @@ The briefing is designed to be read in a minute, not studied:
 - **Conflicts as "was → now"**: "Last briefing said ~$4.1M and growing → System record $3.4M, down
   18.1%". The outdated side stays visible on purpose: the team may still believe it.
 - **Before the meeting**: actions ordered by urgency, overdue items first with a day count.
-- **Ask**: any further question goes through the same retrieval and verification as a section.
+- **Ask chat**: a floating chat on every page; any further question goes through the same
+  retrieval and verification as a section, with citations and verification tags in the answer.
 - **Readable everywhere**: dates as "15 Oct 2026", amounts as "$3.4M", inline citations as small
   numbers that open the source with the sentence highlighted, or the database row itself.
 

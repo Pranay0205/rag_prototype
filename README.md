@@ -52,13 +52,14 @@ A five-minute tour:
    highlighted, or the database row itself.
 3. **Look at the right panel.** The overdue proposal is on top. The "Changed" cards show what the
    last briefing said ($4.1M and growing, Dana Whitfield as CFO) next to what is true now.
-4. **Open the Ask tab** and ask anything. Answers are cited and verified like the briefing.
+4. **Click "Ask about Northwind"** (bottom right, on every page) and ask anything. Answers are
+   cited and verified like the briefing.
 5. **Switch to Sam, then to Kim, and open Helios.** Kim sees the Aurora mandate. Sam does not, and
    nothing on Sam's page names it (only a general "some sources are restricted" notice).
-6. **Search "NWL"** in the top bar: aliases resolve to Northwind. As Kim, search "Northwind": the
-   app says a client matches outside your coverage, without naming it.
+6. **Back on Home**, Companies lists each client with its aliases ("NWL" is Northwind), revenue
+   trend and your role; Facilities shows which credit lines mature soon.
 
-| Home | Ask |
+| Home | Ask chat |
 |---|---|
 | ![Home](docs/images/home.png) | ![Ask](docs/images/ask.png) |
 
@@ -87,7 +88,8 @@ A five-minute tour:
 Principles: numbers only from SQL, cite or omit, access enforced before retrieval, fail visibly,
 document text is data and never instructions, deterministic wherever possible.
 
-**Read next:** the [design walkthrough](docs/DESIGN.md) (decisions, trade-offs, what evaluation
+**Read next:** the [architecture](docs/ARCHITECTURE.md) (diagrams of components, a briefing request,
+ingestion and access control), the [design walkthrough](docs/DESIGN.md) (decisions, trade-offs, what evaluation
 changed, what production would need) and the [evaluation plan](docs/EVALUATION.md) (how it is proven
 safe to run, latest results, and where the evidence is still thin). Requirements live in [`specs/`](specs/00-overview.md); every
 requirement has an ID used in code and test names.

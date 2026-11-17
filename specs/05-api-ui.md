@@ -42,8 +42,8 @@ Errors: tool error codes map to HTTP (`FORBIDDEN`/`NOT_IN_COVERAGE` → 403, `NO
 **UI-1 Header:** user switcher (alex / sam / kim) showing role and clearance; switching
 clears the current briefing.
 
-**UI-2 Left rail:** replaced by UI-11 (home cards) and UI-12 (top bar search). Originally: upcoming meetings; client search box (uses resolve_client;
-ambiguous → pick list).
+**UI-2 Left rail:** replaced by UI-11 (home cards). Originally: upcoming meetings and a client
+search box.
 
 **UI-3 Briefing panel:** meeting header (client, time, attendee chips with title and a New tag);
 key figure cards (ORC-13), exhibits inside their sections (ORC-14),
@@ -79,12 +79,15 @@ who reviewed it and how many claims were checked and removed.
 not), Companies (industry, our role, revenue TTM and YoY, aliases) and Facilities & maturities
 (notional, maturity, amber when within 12 months, utilization). Replaces the meeting sidebar.
 
-**UI-12 Top bar:** brand (home), company search (API-13, Ctrl/Cmd+K, keyboard navigation) and the
-profile menu (switch profile, data health, sign out).
+**UI-12 Top bar:** brand (home) and the profile menu (switch profile, data health, sign out). A
+company search box was tried and removed: the home cards list every covered client, and the chat
+picks its client. API-13 remains available. Browser Back / Forward and reload follow the open
+meeting (`#/meeting/<id>`); the briefing page has a Home link.
 
-**UI-13 Ask tab:** next to Briefing and After the meeting: question box with suggestions; each
-answer renders like a section (inline citations, Verified / Check sources) plus what the data
-does not contain.
+**UI-13 Ask chat:** a floating chat on every page (bottom right). It follows the briefing on
+screen; on the home page the user picks a covered client. Suggested questions; each answer shows
+inline citations, Verified / Check sources per claim and what the data does not contain.
+Conversations are kept per client while the app is open.
 
 ## Priorities for tonight
 

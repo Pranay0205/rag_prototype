@@ -1,0 +1,175 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: Inter, system-ui, sans-serif; background: #f6f7fb; color: #0f172a; }
+  .canvas { width: 1600px; padding: 44px 48px 40px; }
+  h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+  .sub { margin-top: 6px; color: #64748b; font-size: 14px; }
+  .legend { display: flex; gap: 18px; margin-top: 14px; font-size: 12.5px; color: #475569; }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .sw { width: 14px; height: 14px; border-radius: 4px; }
+
+  .flow { display: grid; grid-template-columns: 240px 26px 270px 26px 260px 26px 300px 26px 330px; align-items: stretch; margin-top: 26px; }
+  .arrow { display: grid; place-items: center; color: #94a3b8; }
+  .col { display: flex; flex-direction: column; gap: 10px; }
+  .colhead { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: #64748b; margin-bottom: 2px; }
+
+  .box { background: #fff; border-radius: 14px; padding: 13px 14px; box-shadow: 0 1px 2px rgba(15,23,42,.04), 0 10px 26px -18px rgba(15,23,42,.25); border: 1px solid #e5e7f0; }
+  .box h3 { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .box p, .box li { font-size: 12px; color: #475569; line-height: 1.5; }
+  .box ul { padding-left: 15px; margin-top: 6px; }
+  .tag { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 5px; margin-left: auto; white-space: nowrap; }
+  .code { border-top: 3px solid #4f46e5; }
+  .code .tag { background: #eef2ff; color: #4338ca; }
+  .llm { border-top: 3px solid #c026d3; background: linear-gradient(180deg, #fdf4ff 0%, #fff 60%); }
+  .llm .tag { background: #fae8ff; color: #a21caf; }
+  .store { border-top: 3px solid #0891b2; }
+  .store .tag { background: #ecfeff; color: #0e7490; }
+  .ui { border-top: 3px solid #059669; }
+  .ui .tag { background: #ecfdf5; color: #047857; }
+  .guard { border: 1.5px dashed #f59e0b; background: #fffbeb; }
+  .guard h3 { color: #92400e; }
+  .guard p { color: #92400e; }
+
+  .steps { display: grid; gap: 6px; margin-top: 8px; }
+  .step { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; color: #334155; line-height: 1.4; padding: 7px 9px; border-radius: 9px; background: #f8fafc; border: 1px solid #eef1f6; }
+  .step b { font-weight: 600; }
+  .step.l { background: #fdf4ff; border-color: #f5d0fe; }
+  .n { flex: none; width: 18px; height: 18px; border-radius: 6px; display: grid; place-items: center; font-size: 10px; font-weight: 700; background: #e0e7ff; color: #3730a3; }
+  .step.l .n { background: #f5d0fe; color: #86198f; }
+
+  .bottom { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-top: 22px; }
+  .kpis { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .kpi { font-size: 11.5px; padding: 4px 8px; border-radius: 7px; background: #f1f5f9; color: #334155; }
+  .kpi b { color: #047857; }
+  svg.i { width: 16px; height: 16px; flex: none; }
+</style>
+</head>
+<body>
+<div class="canvas">
+  <h1>Briefing Desk architecture</h1>
+  <div class="sub">From scattered client data to a cited, verified, access-controlled briefing. The model writes; code fetches, computes, checks and decides access.</div>
+  <div class="legend">
+    <span><i class="sw" style="background:#4f46e5"></i>Deterministic code</span>
+    <span><i class="sw" style="background:#c026d3"></i>LLM</span>
+    <span><i class="sw" style="background:#0891b2"></i>Storage</span>
+    <span><i class="sw" style="background:#059669"></i>User interface</span>
+    <span><i class="sw" style="background:#f59e0b"></i>Access control boundary</span>
+  </div>
+
+  <div class="flow">
+    <!-- 1 sources -->
+    <div class="col">
+      <div class="colhead">1 · Sources</div>
+      <div class="box store">
+        <h3>Structured<span class="tag">13 tables</span></h3>
+        <ul><li>Client master, aliases</li><li>Contacts, coverage</li><li>Revenue, holdings</li><li>Financials, pipeline</li><li>Service issues, actions</li><li>Meetings, users</li></ul>
+      </div>
+      <div class="box store">
+        <h3>Unstructured<span class="tag">31 docs</span></h3>
+        <ul><li>Emails, call notes</li><li>Prior briefings</li><li>Research, product</li><li>Approved news</li></ul>
+      </div>
+    </div>
+    <div class="arrow"><svg class="i" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10h11m-4-4 4 4-4 4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+
+    <!-- 2 ingestion -->
+    <div class="col">
+      <div class="colhead">2 · Ingestion</div>
+      <div class="box code" style="flex:1">
+        <h3>Unify once<span class="tag">code</span></h3>
+        <div class="steps">
+          <div class="step"><span class="n">1</span><span><b>Merge duplicates</b> by LEI</span></div>
+          <div class="step"><span class="n">2</span><span><b>Resolve aliases</b>, reject name collisions</span></div>
+          <div class="step"><span class="n">3</span><span><b>Link missing IDs</b> by name (inferred)</span></div>
+          <div class="step"><span class="n">4</span><span><b>Drop duplicate docs</b></span></div>
+          <div class="step"><span class="n">5</span><span><b>Flag stale</b> and prior briefings</span></div>
+          <div class="step"><span class="n">6</span><span><b>Quarantine</b> unapproved news</span></div>
+          <div class="step"><span class="n">7</span><span><b>Screen injection</b> text</span></div>
+          <div class="step"><span class="n">8</span><span><b>Chunk + index</b> BM25 and local embeddings</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="arrow"><svg class="i" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10h11m-4-4 4 4-4 4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+
+    <!-- 3 storage + tools -->
+    <div class="col">
+      <div class="colhead">3 · Store and tools</div>
+      <div class="box store">
+        <h3>briefing.db<span class="tag">SQLite</span></h3>
+        <p>Clean tables, FTS5 keyword index, embedding vectors. Rebuilt from sources.</p>
+      </div>
+      <div class="box guard" style="flex:1">
+        <h3><svg class="i" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 2.5 16 5v4.5c0 3.7-2.6 6.9-6 8-3.4-1.1-6-4.3-6-8V5l6-2.5Z" stroke-linejoin="round"/></svg>Typed tools</h3>
+        <p style="margin-top:6px">The only way to read data. Fixed SQL, no text-to-SQL. Every tool checks <b>coverage</b> and <b>entitlements</b> before returning, and returns citable sources.</p>
+        <ul style="color:#92400e"><li>profile, revenue, holdings</li><li>financials, pipeline</li><li>interactions, meetings</li><li>search documents, clients</li></ul>
+      </div>
+      <div class="box store">
+        <h3>app.db<span class="tag">SQLite</span></h3>
+        <p>Saved briefings, claim reviews and reasons, created actions. Per viewer.</p>
+      </div>
+    </div>
+    <div class="arrow"><svg class="i" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10h11m-4-4 4 4-4 4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+
+    <!-- 4 orchestrator -->
+    <div class="col">
+      <div class="colhead">4 · Orchestrator</div>
+      <div class="box code" style="flex:1">
+        <h3>One briefing, ~8 s<span class="tag">code + LLM</span></h3>
+        <div class="steps">
+          <div class="step"><span class="n">1</span><span><b>Authorize</b> viewer and client</span></div>
+          <div class="step"><span class="n">2</span><span><b>Gather facts</b>, compute key figures and exhibits; stream them</span></div>
+          <div class="step"><span class="n">3</span><span><b>Retrieve per section</b>: filters, then BM25 + vectors fused</span></div>
+          <div class="step"><span class="n">4</span><span><b>Evidence pack</b> E1..En, 6k tokens, documents fenced as untrusted</span></div>
+          <div class="step l"><span class="n">5</span><span><b>Write 7 sections</b> in parallel, cited inline</span></div>
+          <div class="step"><span class="n">6</span><span><b>Verify</b>: IDs exist, numbers match, quotes located, injection cap</span></div>
+          <div class="step l"><span class="n">7</span><span><b>Judge</b>: do the sources support the claim?</span></div>
+          <div class="step"><span class="n">8</span><span><b>Assemble</b>: conflicts, gaps, actions, backstop</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="arrow"><svg class="i" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10h11m-4-4 4 4-4 4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+
+    <!-- 5 api + ui -->
+    <div class="col">
+      <div class="colhead">5 · API and workspace</div>
+      <div class="box code">
+        <h3>FastAPI<span class="tag">code</span></h3>
+        <p>REST + server-sent events: figures, exhibits, then each section as it is verified. Re-checks access on every source and saved briefing.</p>
+      </div>
+      <div class="box ui" style="flex:1">
+        <h3>React workspace<span class="tag">UI</span></h3>
+        <ul>
+          <li><b>Home</b>: meetings, companies, facilities</li>
+          <li><b>Briefing</b>: key figures, 7 sections, inline citations, Verified / Check sources</li>
+          <li><b>Attention</b>: overdue first, was → now conflicts, gaps</li>
+          <li><b>Ask chat</b>: floating, any question, same verification</li>
+          <li><b>Review</b>: accept / reject with reason</li>
+          <li><b>After the meeting</b>: notes to commitments</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom">
+    <div class="box llm">
+      <h3>LLM gateway<span class="tag">OpenAI-compatible</span></h3>
+      <p style="margin-top:4px">One file to swap providers or host internally. JSON mode, schema validation, one repair retry.</p>
+      <div class="kpis"><span class="kpi">Writer: deepseek-chat</span><span class="kpi">Claim judge: fast model</span><span class="kpi">Eval grader: deepseek-reasoner</span></div>
+    </div>
+    <div class="box code">
+      <h3>Evaluation harness<span class="tag">release gates</span></h3>
+      <p style="margin-top:4px">Unit tests, 13 data traps, golden facts, leak sweep across every user and client.</p>
+      <div class="kpis"><span class="kpi">Leaks <b>0</b></span><span class="kpi">Citations <b>100%</b></span><span class="kpi">Numbers <b>100%</b></span><span class="kpi">Traps <b>13/13</b></span><span class="kpi">Recall <b>85%</b></span></div>
+    </div>
+    <div class="box store">
+      <h3>Audit trail<span class="tag">var/runs</span></h3>
+      <p style="margin-top:4px">Every briefing and question logs its evidence, the model's raw output, each verification decision, timing and tokens.</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>
