@@ -275,6 +275,17 @@ def test_ORC_8_suggestions_carry_their_origin(client):
     assert origins["overdue"] == "records"  # open actions in the database, not the model
 
 
+def test_API_19_data_overview(client):
+    d = client.get("/api/data/overview", params={"user_id": "alex"}).json()
+    tables = {t["name"]: t for t in d["tables"]}
+    revenue_cols = {c["name"]: c for c in tables["revenue"]["columns"]}
+    assert revenue_cols["client_id"]["references"] == "clients"
+    assert revenue_cols["source_client_id"]["role"] == "lineage"
+    assert d["merges"][0]["merged_id"] == "C-007" and d["merges"][0]["survivor_id"] == "C-002"
+    assert d["quality_checks"] and all(c["sql"] for c in d["quality_checks"])
+    assert client.get("/api/data/overview", params={"user_id": "nobody"}).status_code == 404
+
+
 def test_API_18_client_overview_respects_access(client):
     def overview(user):
         return client.get("/api/clients/C-002/overview", params={"user_id": user}).json()

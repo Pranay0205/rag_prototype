@@ -7,6 +7,7 @@ import { HistoryMenu } from './components/HistoryMenu'
 import { ContactsExhibit, PipelineExhibit, RevenueExhibit } from './components/Exhibits'
 import { BriefingIndex, FIGURES_ANCHOR } from './components/BriefingIndex'
 import { ClientPage } from './components/ClientPage'
+import { DataPage } from './components/DataPage'
 import { HomeDashboard } from './components/HomeDashboard'
 import { KeyFigures } from './components/KeyFigures'
 import { NotesCapture } from './components/NotesCapture'
@@ -46,6 +47,7 @@ type View = 'briefing' | 'notes'
 // The URL hash names the open meeting (#/meeting/M-901), so browser Back, Forward and reload work.
 const MEETING_HASH = /^#\/meeting\/(.+)$/
 const CLIENT_HASH = /^#\/client\/(.+)$/
+const DATA_HASH = '#/data'
 
 const SESSION_KEY = 'briefing-desk.user'
 
@@ -76,6 +78,7 @@ export default function App() {
   const [meeting, setMeeting] = useState<Meeting | null>(null)
   const [clients, setClients] = useState<{ client_id: string; name: string }[]>([])
   const [clientPage, setClientPage] = useState<string | null>(null) // UI-14: open client page
+  const [dataPage, setDataPage] = useState(false) // UI-15
   const [run, setRun] = useState<Run>(IDLE)
   const [view, setView] = useState<View>('briefing')
   const [reviews, setReviews] = useState<Record<string, Review>>({})
@@ -170,6 +173,7 @@ export default function App() {
   /** Opening a meeting adds a browser history entry, so Back returns to where you came from. */
   function openMeeting(m: Meeting) {
     setClientPage(null)
+    setDataPage(false)
     if (m.meeting_id !== meeting?.meeting_id) {
       window.history.pushState({ meetingId: m.meeting_id }, '', `#/meeting/${m.meeting_id}`)
     }
@@ -182,6 +186,16 @@ export default function App() {
     closeStream.current?.()
     setMeeting(null)
     setClientPage(null)
+    setDataPage(false)
+  }
+
+  /** UI-15: the data page (tables, unification, quality checks). */
+  function openData() {
+    window.history.pushState(null, '', DATA_HASH)
+    closeStream.current?.()
+    setMeeting(null)
+    setClientPage(null)
+    setDataPage(true)
   }
 
   /** "Ask about ..." buttons open the chat on that client. */
@@ -195,6 +209,7 @@ export default function App() {
     window.history.pushState({ clientId }, '', `#/client/${clientId}`)
     closeStream.current?.()
     setMeeting(null)
+    setDataPage(false)
     setClientPage(clientId)
   }
 
@@ -203,6 +218,7 @@ export default function App() {
     const onPop = () => {
       const m = meetings.find((x) => x.meeting_id === MEETING_HASH.exec(window.location.hash)?.[1])
       setClientPage(m ? null : (CLIENT_HASH.exec(window.location.hash)?.[1] ?? null))
+      setDataPage(window.location.hash === DATA_HASH)
       if (m) selectMeeting(m)
       else {
         closeStream.current?.()
@@ -217,7 +233,10 @@ export default function App() {
   useEffect(() => {
     const m = meetings.find((x) => x.meeting_id === MEETING_HASH.exec(window.location.hash)?.[1])
     if (m) selectMeeting(m)
-    else setClientPage(CLIENT_HASH.exec(window.location.hash)?.[1] ?? null)
+    else {
+      setClientPage(CLIENT_HASH.exec(window.location.hash)?.[1] ?? null)
+      setDataPage(window.location.hash === DATA_HASH)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meetings])
 
@@ -330,12 +349,16 @@ export default function App() {
         users={users}
         me={me}
         onHome={goHome}
-        crumb={(meeting?.legal_name ?? clientName)?.replace(/ (Inc\.|plc|LLC)$/, '') ?? null}
+        crumb={dataPage ? 'Data' : ((meeting?.legal_name ?? clientName)?.replace(/ (Inc\.|plc|LLC)$/, '') ?? null)}
+        onData={openData}
+        dataActive={dataPage}
         onSwitch={setUserId}
         onSignOut={() => setUserId(null)}
       />
       {/* One canvas and one scroll: side panels are sticky cards beside the briefing, not separate strips */}
       <div className="min-h-0 flex-1 overflow-y-auto">
+        {!meeting && dataPage && <DataPage userId={userId} />}
+
         {!meeting && clientPage && (
           <ClientPage
             clientId={clientPage}
@@ -349,7 +372,7 @@ export default function App() {
           />
         )}
 
-        {!meeting && !clientPage && (
+        {!meeting && !clientPage && !dataPage && (
           <HomeDashboard
             userId={userId}
             name={me?.name.split(' ')[0] ?? ''}

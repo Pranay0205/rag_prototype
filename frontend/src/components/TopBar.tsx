@@ -1,19 +1,20 @@
 // UI-12 top bar: brand (home) and the profile menu.
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { User } from '../api'
-import { DataHealthDialog } from './DataHealthDialog'
-import { Avatar, Logo, Wordmark } from './ui'
+import { Avatar, Logo, Wordmark, cn } from './ui'
 
 interface Props {
   users: User[]
   me: User | undefined
   onHome: () => void
   crumb?: string | null // the open client, shown as Home > Client
+  onData: () => void // UI-15 data page
+  dataActive: boolean
   onSwitch: (userId: string) => void
   onSignOut: () => void
 }
 
-export function TopBar({ users, me, onHome, crumb, onSwitch, onSignOut }: Props) {
+export function TopBar({ users, me, onHome, crumb, onData, dataActive, onSwitch, onSignOut }: Props) {
   // z-30 keeps the profile menu above the page content
   return (
     <header className="relative z-30 shrink-0 border-b border-slate-200 bg-white">
@@ -40,7 +41,24 @@ export function TopBar({ users, me, onHome, crumb, onSwitch, onSignOut }: Props)
             </nav>
           )}
         </div>
-        {me && <ProfileMenu users={users} me={me} onSwitch={onSwitch} onSignOut={onSignOut} />}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onData}
+            aria-current={dataActive ? 'page' : undefined}
+            title="How the data is loaded, unified and checked"
+            className={cn(
+              'inline-flex h-9 items-center gap-2 rounded-full px-3.5 text-[14px] font-medium transition',
+              dataActive ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+            )}
+          >
+            <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+              <ellipse cx="10" cy="5" rx="6" ry="2.5" />
+              <path d="M4 5v10c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5V5M4 10c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5" />
+            </svg>
+            Data
+          </button>
+          {me && <ProfileMenu users={users} me={me} onSwitch={onSwitch} onSignOut={onSignOut} />}
+        </div>
       </div>
     </header>
   )
@@ -58,7 +76,6 @@ function ProfileMenu({
   onSignOut: () => void
 }) {
   const [open, setOpen] = useState(false)
-  const [healthOpen, setHealthOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -113,19 +130,10 @@ function ProfileMenu({
               ))}
           </div>
           <div className="border-t border-slate-100 py-1">
-            <MenuItem
-              onClick={() => {
-                setOpen(false)
-                setHealthOpen(true)
-              }}
-            >
-              Data health
-            </MenuItem>
             <MenuItem onClick={onSignOut}>Sign out</MenuItem>
           </div>
         </div>
       )}
-      {healthOpen && <DataHealthDialog onClose={() => setHealthOpen(false)} />}
     </div>
   )
 }

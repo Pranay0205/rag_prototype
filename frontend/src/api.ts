@@ -44,17 +44,46 @@ export interface Commitment {
   grounded: boolean
 }
 
-export interface DataHealth {
-  merges: { merged_id: string; survivor_id: string }[]
+/** API-19: the data behind the app: tables, unification and quality checks (UI-15). */
+export interface DataOverview {
+  built_at: string
+  today: string
+  tables: {
+    name: string
+    group: string
+    description: string
+    rows: number
+    columns: { name: string; role: 'key' | 'link' | 'lineage' | null; references: string | null }[]
+  }[]
+  merges: {
+    merged_id: string
+    survivor_id: string
+    rule: string
+    evidence: { lei: string; merged_legal_name: string; survivor_created: string; merged_created: string }
+  }[]
+  aliases: number
+  contacts_deduplicated: string[]
   documents: {
     total: number
+    by_link_method: Record<string, number>
     inferred_links: { doc_id: string; client_id: string; confidence: number }[]
     duplicates: { doc_id: string; duplicate_of: string }[]
     quarantined_news: string[]
+    derived: string[]
+    stale: string[]
     suspected_injection: string[]
     unlinked: string[]
   }
-  index: { chunks_indexed: number; embedding_model: string }
+  index: { chunks_indexed: number; embedding_model: string } | null
+  quality_checks: {
+    id: string
+    check: string
+    severity: 'error' | 'warning' | 'info'
+    passed: boolean
+    failures: number
+    examples: Record<string, unknown>[]
+    sql: string
+  }[]
 }
 
 export class ApiError extends Error {
@@ -336,7 +365,7 @@ export const api = {
   history: (userId: string, clientId: string) =>
     request<HistoryItem[]>(`/api/briefings/history?user_id=${userId}&client_id=${clientId}`),
 
-  dataHealth: () => request<DataHealth>('/api/health/data'),
+  dataOverview: (userId: string) => request<DataOverview>(`/api/data/overview?user_id=${userId}`),
 
   home: (userId: string) => request<HomeData>(`/api/home?user_id=${userId}`),
 

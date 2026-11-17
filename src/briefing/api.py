@@ -669,6 +669,81 @@ def data_health():
     return json.loads(path.read_text())
 
 
+# (group, what the table holds, primary key) for the data page (API-19). Links between tables are
+# found from column names: every table joins to clients on client_id.
+TABLES = {
+    "clients": ("Clients", "One row per client, after merging duplicates", "client_id"),
+    "client_aliases": ("Clients", "Other names a client is known by, including merged records' names", None),
+    "client_merge": ("Clients", "Log of merged duplicate clients and the evidence", None),
+    "contacts": ("Clients", "People at the client, current and former", "contact_id"),
+    "coverage": ("Clients", "Which banker covers which client, and in what role", None),
+    "users": ("Clients", "Bankers, with clearance and access groups", "user_id"),
+    "revenue": ("Money", "What we earn from the client, per quarter and product line", None),
+    "holdings": ("Money", "Products and facilities the client holds", "holding_id"),
+    "financials": ("Money", "The client's own reported results", None),
+    "opportunities": ("Activity", "Pipeline deals; some are restricted to a deal team", "opp_id"),
+    "open_actions": ("Activity", "What we promised the client, with due dates", "action_id"),
+    "service_issues": ("Activity", "Problems the client raised with us", "issue_id"),
+    "interactions": ("Activity", "Calls and meetings logged in the CRM", "interaction_id"),
+    "meetings": ("Activity", "Upcoming meetings from the calendar", "meeting_id"),
+    "documents": ("Documents", "Emails, notes, news and research, linked by client ID or by name", "doc_id"),
+    "chunks": ("Documents", "Document passages indexed for keyword and meaning search", "chunk_id"),
+}
+LINKS = {"client_id": "clients", "survivor_id": "clients", "merged_id": "clients", "user_id": "users"}
+LINKS |= {"owner": "users", "doc_id": "documents"}
+
+
+@app.get("/api/data/overview")
+def data_overview(user_id: str):
+    """API-19: the data behind the app for the data page (UI-15): each table with its columns, keys,
+    links and row count; what unification did (merges with their evidence, aliases, document
+    linking); and the ING-12 quality checks with the SQL each one runs. Metadata, counts and IDs
+    only: no record contents, so no entitlement can be bypassed here."""
+    viewer_or_404(tools(), user_id)
+    path = config.VAR_DIR / "ingestion_report.json"
+    if not path.exists():
+        raise HTTPException(503, {"code": "UNAVAILABLE", "message": "Run ingestion first"})
+    report = json.loads(path.read_text())
+    conn = connect()
+    tables = []
+    for name, (group, description, pk) in TABLES.items():
+        cols = [c[1] for c in conn.execute(f'PRAGMA table_info("{name}")')]
+        tables.append(
+            {
+                "name": name,
+                "group": group,
+                "description": description,
+                "rows": conn.execute(f'SELECT COUNT(*) FROM "{name}"').fetchone()[0],
+                "columns": [
+                    {
+                        "name": c,
+                        "role": "key"
+                        if c == pk
+                        else "lineage"
+                        if c == "source_client_id"
+                        else "link"
+                        if LINKS.get(c) not in (None, name)
+                        else None,
+                        "references": LINKS.get(c) if c != pk else None,
+                    }
+                    for c in cols
+                ],
+            }
+        )
+    merges = [{**m, "evidence": json.loads(m["evidence"])} for m in rows(conn, "SELECT * FROM client_merge")]
+    return {
+        "built_at": report["built_at"],
+        "today": report["today"],
+        "tables": tables,
+        "merges": merges,
+        "aliases": conn.execute("SELECT COUNT(*) FROM client_aliases").fetchone()[0],
+        "contacts_deduplicated": report.get("contacts_deduplicated", []),
+        "documents": report.get("documents", {}),
+        "index": report.get("index"),
+        "quality_checks": report.get("quality_checks", []),
+    }
+
+
 # Demo mode: serve the built React app from the same port (npm run build in frontend/)
 class _UI(StaticFiles):
     """The built UI. index.html is never cached: it names the current hashed bundles, so a cached

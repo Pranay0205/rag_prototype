@@ -28,6 +28,7 @@ Status: DRAFT for review
 | API-8 | `POST /actions` `{client_id, kind, description, owner, due, citations}` | Create follow-up / flag stale |
 | API-9 | `POST /clients/{id}/notes` `{user_id, text}` | Post-meeting notes → proposed commitments (fast model); returns proposals, nothing saved until confirmed |
 | API-10 | `GET /health/data` | Ingestion report (ING-11) |
+| API-19 | `GET /data/overview?user_id` | The data page (UI-15). Each table with its columns, key, links (by column name: `client_id` → clients, etc.) and row count; merges with their evidence; alias count; document linking; index; ING-12 quality checks with their SQL. Metadata, counts and IDs only, no record contents |
 | API-11 | `GET /briefings/latest?user_id&client_id[&briefing_id]` | The viewer's last saved briefing with their reviews and created actions; `stale` if data was re-ingested since. Saved per viewer, never shared; coverage re-checked on read; not served if the viewer's clearance or groups changed since (must regenerate). User state lives in `var/app.db`, separate from the rebuildable source DB |
 | API-13 | `GET /clients/search?user_id&q` | Company search (TOOL-14); `notice` when only an out-of-coverage client matches |
 | API-14 | `POST /clients/{id}/ask` `{user_id, question}` | Cited, verified answer (ORC-15) |
@@ -79,7 +80,7 @@ who reviewed it and how many claims were checked and removed.
 
 **UI-8 Post-meeting capture:** text area → proposed commitments list → confirm creates actions.
 
-**UI-9 Data health:** small panel/modal showing the ingestion report.
+**UI-9 Data health:** replaced by UI-15.
 
 **UI-10 Cost & latency footer:** tokens, cost (if provider reports it), generation time.
 
@@ -88,7 +89,7 @@ chips: revenue trend, a facility maturing within 12 months, new key contacts); T
 one colour per client); Clients (revenue TTM and YoY, aliases); Facilities & maturities on a shared
 timeline with the next 12 months shaded. Replaces the meeting sidebar.
 
-**UI-12 Top bar:** brand (home) and the profile menu (switch profile, data health, sign out). A
+**UI-12 Top bar:** brand (home), a Data link (UI-15) and the profile menu (switch profile, sign out). A
 company search box was tried and removed: the home cards list every covered client, and the chat
 picks its client. API-13 remains available. Browser Back / Forward and reload follow the open
 meeting or client (`#/meeting/<id>`, `#/client/<id>`); the breadcrumb has a Home link.
@@ -101,6 +102,16 @@ service issues, the client's reported financials, and the documents the viewer m
 opens its source in the drawer. Straight from the database, so it loads instantly. A "Data as of" line
 shows when the data was loaded and the newest record per source (revenue quarter, CRM activity, email,
 notes, news, financials), so a stale feed is visible.
+
+**UI-15 Data page (`#/data`):** what sits under the banker's screens, from API-19. It has four parts:
+- headline counts;
+- the data model, grouped (Clients, Money, Activity, Documents), with each table's columns marked as
+  key, link or lineage;
+- what unification did, step by step (merge with its evidence, alias matching, document linking,
+  duplicates removed, secondary and stale marking, held-back news and injection, indexing);
+- the quality checks, each opening its SQL and failing rows.
+
+The source drawer's Calculation tab (TOOL-16) is the per-figure view of the same idea.
 
 **UI-13 Ask chat:** a hovering ask bar at the bottom centre of every page, plus "Ask about <client>" in the
 briefing header and "Ask about this client" on Home; the panel opens in place and can switch client
