@@ -24,6 +24,13 @@
 
 9. Preserve Existing Codebase Patterns
 
+10. Write user-facing copy in ASD-STE100 Simplified Technical English, to about 85% compliance.
+    - Short sentences: at most 20 words for an instruction, 25 for a description. One idea per sentence.
+    - Active voice and simple tenses ("The system merged them", not "They were merged").
+    - Plain, approved-style words; avoid phrasal verbs and "-ing" nouns where a simple verb works.
+    - Keep technical names, IDs and terms as they are (LEI, BM25, C-007).
+    - The remaining 15% is room for natural wording where strict STE would read awkwardly.
+
 # Client Meeting Briefing Intelligence — prototype
 
 Spec-driven: `specs/` is the source of truth. Read `specs/00-overview.md` first.

@@ -71,19 +71,19 @@ export function DataPage({ userId }: { userId: string }) {
         )}
       </Panel>
 
-      <Panel title="Needs attention" note="Everything else passed">
+      <Panel title="Needs attention" note="All other checks are correct.">
         <ul className="divide-y divide-slate-100">
           {data.merges.map((m) => (
             <Step key={m.merged_id} n={1} title="Duplicate client merged" tone="indigo">
-              <Mono>{m.merged_id}</Mono> "{m.evidence.merged_legal_name}" became <Mono>{m.survivor_id}</Mono>: same
-              LEI. Its rows moved across with their original ID kept.
+              <Mono>{m.merged_id}</Mono> "{m.evidence.merged_legal_name}" and <Mono>{m.survivor_id}</Mono> have the same
+              LEI. The system merged them into <Mono>{m.survivor_id}</Mono>. Each row keeps its original ID.
             </Step>
           ))}
           {gaps.map((c, i) => (
             <Step key={c.id} n={data.merges.length + i + 1} title={c.id === 'Q10' ? 'Missing data' : c.check} tone={c.severity === 'error' ? 'rose' : 'amber'}>
               {c.id === 'Q10'
-                ? `${c.examples.map((e) => String(e.client_id)).join(', ')} is missing a quarter: the app says so and gives no 12-month total, rather than estimating one.`
-                : `${c.failures} failing.`}
+                ? `${c.examples.map((e) => String(e.client_id)).join(', ')} has no revenue data for one quarter. The app shows this gap. It does not estimate a 12-month total.`
+                : `${c.failures} rows are not correct.`}
             </Step>
           ))}
         </ul>
@@ -100,52 +100,58 @@ export function DataPage({ userId }: { userId: string }) {
       {showAll && (
         <>
       {/* unification */}
-      <Panel title="What unification did" note="Run at every load, in this order">
+      <Panel title="What unification did" note="The system does these steps in this sequence each time it loads the data.">
         <ol className="divide-y divide-slate-100">
           {data.merges.map((m) => (
             <Step key={m.merged_id} n={1} title="Duplicate client merged" tone="indigo">
-              <Mono>{m.merged_id}</Mono> "{m.evidence.merged_legal_name}" merged into <Mono>{m.survivor_id}</Mono>: same LEI{' '}
-              <Mono>{m.evidence.lei}</Mono>; the older record (since {readable(m.evidence.survivor_created)}) is kept. All
-              of its rows moved across with their original ID kept.
+              <Mono>{m.merged_id}</Mono> "{m.evidence.merged_legal_name}" and <Mono>{m.survivor_id}</Mono> have the same
+              LEI (<Mono>{m.evidence.lei}</Mono>). The system merged them and kept the older record, from{' '}
+              {readable(m.evidence.survivor_created)}. All rows moved to <Mono>{m.survivor_id}</Mono>. Each row keeps its
+              original ID.
               {data.contacts_deduplicated.length > 0 && (
                 <>
                   {' '}
-                  A contact recorded under both was kept once (<Mono>{data.contacts_deduplicated.join(', ')}</Mono> removed).
+                  One contact was in both records. The system kept one copy and removed{' '}
+                  <Mono>{data.contacts_deduplicated.join(', ')}</Mono>.
                 </>
               )}
             </Step>
           ))}
           <Step n={2} title="Names matched to clients" tone="indigo">
-            {data.aliases} aliases map other names to a client ("NWL" is Northwind). Fuzzy matching rejects a look-alike
-            with a different distinguishing word ("Cascade Health Systems" is not "Cascade Health Partners").
+            {data.aliases} aliases connect other names to a client. For example, "NWL" is Northwind. Fuzzy matching does
+            not accept a name with a different key word. For example, "Cascade Health Systems" is not "Cascade Health
+            Partners".
           </Step>
           <Step n={3} title="Documents linked" tone="indigo">
-            {docs.by_link_method.source_id ?? 0} by client ID ·{' '}
+            The system linked {docs.by_link_method.source_id ?? 0} documents by client ID.{' '}
             {docs.inferred_links.map((l) => (
               <span key={l.doc_id}>
-                <Mono>{l.doc_id}</Mono> by name ({Math.round(l.confidence * 100)}% confidence, labelled in the app) ·{' '}
+                It linked <Mono>{l.doc_id}</Mono> by name, with {Math.round(l.confidence * 100)}% confidence. The app shows
+                this as a label.{' '}
               </span>
             ))}
-            {firmWide} firm-wide research and product updates linked to no client on purpose
+            {firmWide} research and product documents apply to all clients. The system does not link them to one client.
           </Step>
           <Step n={4} title="Duplicates removed" tone="amber">
             {docs.duplicates.map((d) => (
               <span key={d.doc_id}>
-                <Mono>{d.doc_id}</Mono> is a forwarded copy of <Mono>{d.duplicate_of}</Mono>, so it is not indexed.{' '}
+                <Mono>{d.doc_id}</Mono> is a forwarded copy of <Mono>{d.duplicate_of}</Mono>. The system does not index the
+                copy.{' '}
               </span>
             ))}
           </Step>
-          <Step n={5} title="Older and secondary sources marked" tone="amber">
-            {docs.derived.length} prior briefings marked as secondary (system records win when they disagree);{' '}
-            {docs.stale.length} document older than 180 days marked stale.
+          <Step n={5} title="Old and secondary sources identified" tone="amber">
+            {docs.derived.length} prior briefings are secondary sources. If they do not agree with the system records,
+            the system records are correct. {docs.stale.length} document is older than 180 days. The system marks it as
+            stale.
           </Step>
-          <Step n={6} title="Held back" tone="rose">
-            Unapproved news stored but never indexed: <Mono>{docs.quarantined_news.join(', ')}</Mono>. Suspected prompt
-            injection fenced as data, and claims citing it are never verified:{' '}
-            <Mono>{docs.suspected_injection.join(', ')}</Mono>.
+          <Step n={6} title="Sources not used" tone="rose">
+            The news item <Mono>{docs.quarantined_news.join(', ')}</Mono> is not approved. The system keeps it but does
+            not index it. The email <Mono>{docs.suspected_injection.join(', ')}</Mono> possibly contains a prompt
+            injection. The system uses its text only as data. A claim that uses this email is never verified.
           </Step>
           <Step n={7} title="Indexed for search" tone="indigo">
-            {data.index?.chunks_indexed ?? 0} passages indexed twice: by keyword (BM25) and by meaning (
+            The system indexed {data.index?.chunks_indexed ?? 0} passages in two ways: by keyword (BM25) and by meaning (
             {data.index?.embedding_model ?? 'embeddings'}).
           </Step>
         </ol>
