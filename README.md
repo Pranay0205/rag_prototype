@@ -85,8 +85,11 @@ A five-minute tour:
 | Deciding which side of a conflict is outdated | |
 
 Principles: numbers only from SQL, cite or omit, access enforced before retrieval, fail visibly,
-document text is data and never instructions, deterministic wherever possible. The full design is
-in [`specs/`](specs/00-overview.md); every requirement has an ID used in code and test names.
+document text is data and never instructions, deterministic wherever possible.
+
+**Read next:** the [design walkthrough](docs/DESIGN.md) (decisions, trade-offs, what evaluation
+changed, what production would need). Requirements live in [`specs/`](specs/00-overview.md); every
+requirement has an ID used in code and test names.
 
 **Stack:** Python 3.12, FastAPI, SQLite (FTS5 for keyword search, vectors stored alongside),
 fastembed (`bge-small-en-v1.5`, runs locally), DeepSeek through an OpenAI-compatible gateway,
