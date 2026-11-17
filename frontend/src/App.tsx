@@ -2,13 +2,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError, api, type ClientAction, type HistoryItem, type Meeting, type User } from './api'
 import { AttentionPanel, originOf, type ActionState } from './components/AttentionPanel'
-import { ChatWidget } from './components/ChatWidget'
+import { ALL, ChatWidget } from './components/ChatWidget'
 import { HistoryMenu } from './components/HistoryMenu'
 import { ContactsExhibit, PipelineExhibit, RevenueExhibit } from './components/Exhibits'
 import { BriefingIndex, FIGURES_ANCHOR } from './components/BriefingIndex'
 import { ClientPage } from './components/ClientPage'
 import { DataPage } from './components/DataPage'
-import { HomeDashboard } from './components/HomeDashboard'
+import { HomeDashboard, type TryKind } from './components/HomeDashboard'
 import { KeyFigures } from './components/KeyFigures'
 import { NotesCapture } from './components/NotesCapture'
 import { SectionCard, type RejectReason, type Review } from './components/SectionCard'
@@ -88,6 +88,8 @@ export default function App() {
   const [drawer, setDrawer] = useState<Citation | null>(null)
   const [chatOpen, setChatOpen] = useState(false)
   const [chatClient, setChatClient] = useState<string | null>(null) // client asked about from Home
+  const [chatPrompt, setChatPrompt] = useState<{ question: string; scope: string; id: number } | null>(null)
+  const [openRevenue, setOpenRevenue] = useState(false) // client page opens on its revenue calculation
   const [history, setHistory] = useState<HistoryItem[]>([])
   const [copied, setCopied] = useState(false)
   const closeStream = useRef<(() => void) | null>(null)
@@ -204,8 +206,21 @@ export default function App() {
     setChatOpen(true)
   }
 
+  /** The Home "try" card: each step is a direct action, so it works whatever is on screen. */
+  function tryIt(kind: TryKind, clientId: string) {
+    if (kind === 'calculation') {
+      openClient(clientId, true)
+    } else if (kind === 'across') {
+      setChatPrompt({ question: 'Where are we overdue across my clients?', scope: ALL, id: Date.now() })
+    } else {
+      setUserId('sam') // an analyst without the Aurora clearance; the same question as Kim shows the difference
+      setChatPrompt({ question: 'Is Helios selling any assets or wind portfolios?', scope: 'C-002', id: Date.now() })
+    }
+  }
+
   /** UI-14: a client opens its own page (the whole relationship), not its next meeting. */
-  function openClient(clientId: string) {
+  function openClient(clientId: string, withRevenue = false) {
+    setOpenRevenue(withRevenue)
     window.history.pushState({ clientId }, '', `#/client/${clientId}`)
     closeStream.current?.()
     setMeeting(null)
@@ -369,6 +384,7 @@ export default function App() {
               if (m) openMeeting(m)
             }}
             onAsk={askAbout}
+            openRevenue={openRevenue}
           />
         )}
 
@@ -380,8 +396,9 @@ export default function App() {
               const m = meetings.find((x) => x.meeting_id === id)
               if (m) openMeeting(m)
             }}
-            onOpenClient={openClient}
+            onOpenClient={(id) => openClient(id)}
             onAsk={askAbout}
+            onTry={tryIt}
           />
         )}
 
@@ -478,6 +495,7 @@ export default function App() {
         open={chatOpen}
         onOpenChange={setChatOpen}
         onCite={setDrawer}
+        prompt={chatPrompt}
       />
 
       {drawer && <SourceDrawer citation={drawer} userId={userId} onClose={() => setDrawer(null)} />}

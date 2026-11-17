@@ -7,7 +7,7 @@ import type { Citation } from '../types'
 import { ClaimText, VerificationTag } from './SectionCard'
 import { cn, readable } from './ui'
 
-const ALL = '*' // scope: every client the viewer covers (agentic search, API-20)
+export const ALL = '*' // scope: every client the viewer covers (agentic search, API-20)
 
 const ALL_SUGGESTIONS = [
   'Which client has a term loan?',
@@ -31,9 +31,10 @@ interface Props {
   open: boolean // opened by the "Ask about ..." buttons
   onOpenChange: (open: boolean) => void
   onCite: (c: Citation) => void
+  prompt?: { question: string; scope: string; id: number } | null // asked for the user (Home "try" card)
 }
 
-export function ChatWidget({ userId, clients, currentClientId, open, onOpenChange, onCite }: Props) {
+export function ChatWidget({ userId, clients, currentClientId, open, onOpenChange, onCite, prompt }: Props) {
   const setOpen = onOpenChange
   const [clientId, setClientId] = useState<string>(currentClientId ?? ALL)
   const [threads, setThreads] = useState<Record<string, Turn[]>>({})
@@ -88,12 +89,12 @@ export function ChatWidget({ userId, clients, currentClientId, open, onOpenChang
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text, userId])
 
-  async function ask(question: string) {
+  async function ask(question: string, scope?: string) {
     const q = question.trim()
     if (!q || busy) return
     // a client named in the question wins; otherwise the scope chosen (one client, or all of them)
     const named = detected ?? (await clientNamedIn(q))
-    const cid = named?.client_id ?? clientId
+    const cid = named?.client_id ?? scope ?? clientId
     setClientId(cid)
     const id = Date.now()
     const started = performance.now()
@@ -108,6 +109,14 @@ export function ChatWidget({ userId, clients, currentClientId, open, onOpenChang
       update({ error: (e as ApiError).message })
     }
   }
+
+  // a question asked on the user's behalf: open the panel and ask it in the given scope
+  useEffect(() => {
+    if (!prompt) return
+    setOpen(true)
+    ask(prompt.question, prompt.scope)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prompt?.id])
 
   if (!open) {
     // a hovering ask bar at the bottom of every page; the panel opens in the same place

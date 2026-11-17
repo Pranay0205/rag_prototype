@@ -36,7 +36,8 @@ a small local embedding model. Later runs start in seconds.
 
 ## Try it
 
-Sign in with one of three demo profiles. They differ in access, which is the point.
+Sign in with one of three demo profiles. They differ in access, which is the point. (Sign-in is a
+demo picker, not real authentication; see [Known limitations](docs/DESIGN.md#13-known-limitations).)
 
 | Profile | Role | Can see |
 |---|---|---|
@@ -44,14 +45,16 @@ Sign in with one of three demo profiles. They differ in access, which is the poi
 | **Sam Okafor** | Analyst | All three clients, internal documents only |
 | **Kim Laurent** | M&A Director | Helios only, including the restricted Project Aurora deal |
 
-A five-minute tour:
+A five-minute tour (or use the **New here? Try** card on Home, which runs three of these in one click
+each):
 
 1. **As Alex, open Northwind.** The key figure cards appear instantly (computed from the database,
    no model involved). Click **Prepare briefing**: seven sections stream in about 8 seconds.
 2. **Click a small number like ¹** inside a sentence. The source opens with the exact sentence
    highlighted, or the database row itself.
-3. **Look at the prep panel on the right.** Under To do, the overdue proposal is on top. Under Conflicts, "Changed" cards show what the
-   last briefing said ($4.1M and growing, Dana Whitfield as CFO) next to what is true now.
+3. **Look at the prep panel on the right.** Under To do, the overdue proposal is on top. Under
+   Conflicts, "Changed" cards show what the last briefing said ($4.1M and growing, Dana Whitfield as
+   CFO) next to what is true now.
 4. **Click the revenue figure.** The Calculation tab shows the working: the rule, each step of
    arithmetic, the SQL as it ran and the rows used.
 5. **Ask in the bar at the bottom of the page.** "How should I prepare for the Northwind meeting?"
@@ -114,6 +117,9 @@ Rebuilds the data, generates a briefing for every user and client, and checks it
 golden answers and 14 data traps. It prints PASS/FAIL per gate, writes `var/eval/latest.md`, and exits
 non-zero if any release gate fails. Golden facts are graded by a different model from the writer
 (`deepseek-reasoner`) so the grader does not share the writer's blind spots.
+
+The run rebuilds the database, so briefings saved earlier show "Source data changed" until they are
+regenerated. That banner is the staleness check working, not an error.
 
 Latest run (14 briefings, report in [`eval/latest.md`](eval/latest.md)):
 

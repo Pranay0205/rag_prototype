@@ -11,7 +11,12 @@ interface Props {
   onOpenMeeting: (meetingId: string) => void
   onOpenClient: (clientId: string) => void
   onAsk: (clientId: string) => void
+  onTry: (kind: TryKind, clientId: string) => void
 }
+
+export type TryKind = 'calculation' | 'across' | 'access'
+
+const TRY_KEY = 'briefing-desk.try-hidden'
 
 function greeting(): string {
   const h = new Date().getHours()
@@ -32,7 +37,7 @@ function inDays(n: number): string {
 
 const short = (name: string) => name.replace(/ (Inc\.|plc|LLC)$/, '')
 
-export function HomeDashboard({ userId, name, onOpenMeeting, onOpenClient, onAsk }: Props) {
+export function HomeDashboard({ userId, name, onOpenMeeting, onOpenClient, onAsk, onTry }: Props) {
   const [data, setData] = useState<HomeData | null>(null)
 
   useEffect(() => {
@@ -60,6 +65,8 @@ export function HomeDashboard({ userId, name, onOpenMeeting, onOpenClient, onAsk
           {soon > 0 && ` · ${soon} ${soon === 1 ? 'facility matures' : 'facilities mature'} within 12 months`}
         </p>
       </div>
+
+      <TryCard clientId={next?.client_id ?? data.companies[0]?.client_id} onTry={onTry} />
 
       {next && <NextUp data={data} onOpenMeeting={onOpenMeeting} onAsk={onAsk} />}
 
@@ -361,5 +368,60 @@ function ReadyPill({ ready }: { ready: boolean }) {
     <span className="inline-flex h-[22px] items-center rounded-full bg-slate-100 px-2 text-[12px] font-medium text-slate-600">
       Not prepared
     </span>
+  )
+}
+
+/** Three one-click starting points for someone exploring alone. Each step is a direct action (open a
+ * page, ask a question), so nothing points at the layout and nothing can misfire. Dismissible. */
+function TryCard({ clientId, onTry }: { clientId?: string; onTry: Props['onTry'] }) {
+  const [hidden, setHidden] = useState(() => {
+    try {
+      return localStorage.getItem(TRY_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
+  if (hidden || !clientId) return null
+  const steps: { kind: TryKind; title: string; detail: string }[] = [
+    { kind: 'calculation', title: 'Why trust a number', detail: 'The working behind revenue' },
+    { kind: 'across', title: 'Ask across your book', detail: '"Where are we overdue?"' },
+    { kind: 'access', title: 'See access control', detail: 'Ask as Sam, then as Kim' },
+  ]
+  return (
+    <section aria-label="Things to try" className={cn(CARD, 'rise flex flex-wrap items-center gap-3 px-5 py-4')}>
+      <p className="w-full text-[13px] font-semibold text-slate-700 sm:w-auto sm:pr-2">New here? Try</p>
+      {steps.map((s, i) => (
+        <button
+          key={s.kind}
+          onClick={() => onTry(s.kind, clientId)}
+          className="flex min-w-0 flex-1 basis-[220px] items-center gap-3 rounded-xl border border-slate-200 px-3.5 py-2.5 text-left transition hover:border-slate-400 hover:bg-slate-50"
+        >
+          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-slate-900 text-[12px] font-semibold text-white">
+            {i + 1}
+          </span>
+          <span className="min-w-0">
+            <span className="block text-[14px] font-semibold">{s.title}</span>
+            <span className="block truncate text-[12.5px] text-slate-600">{s.detail}</span>
+          </span>
+        </button>
+      ))}
+      <button
+        onClick={() => {
+          setHidden(true)
+          try {
+            localStorage.setItem(TRY_KEY, '1')
+          } catch {
+            // storage unavailable: hidden for this visit only
+          }
+        }}
+        aria-label="Hide suggestions"
+        title="Hide"
+        className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+      >
+        <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <path d="M6 6l8 8M14 6l-8 8" strokeLinecap="round" />
+        </svg>
+      </button>
+    </section>
   )
 }

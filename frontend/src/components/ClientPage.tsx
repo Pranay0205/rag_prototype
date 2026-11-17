@@ -14,6 +14,7 @@ interface Props {
   onCite: (c: Citation) => void
   onOpenMeeting: (meetingId: string) => void
   onAsk: (clientId: string) => void
+  openRevenue?: boolean // the Home "try" card: show the revenue calculation straight away
 }
 
 const DOCS_SHOWN = 5 // most recent first; the rest behind "Show all"
@@ -26,7 +27,7 @@ const STAGE: Record<string, string> = {
   stalled: 'bg-amber-50 text-amber-800',
 }
 
-export function ClientPage({ clientId, userId, onCite, onOpenMeeting, onAsk }: Props) {
+export function ClientPage({ clientId, userId, onCite, onOpenMeeting, onAsk, openRevenue }: Props) {
   const [data, setData] = useState<ClientOverview | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [allDocs, setAllDocs] = useState(false)
@@ -34,7 +35,11 @@ export function ClientPage({ clientId, userId, onCite, onOpenMeeting, onAsk }: P
   useEffect(() => {
     setData(null)
     setError(null)
-    api.clientOverview(clientId, userId).then(setData, (e: ApiError) => setError(e.message))
+    api.clientOverview(clientId, userId).then((d) => {
+      setData(d)
+      if (openRevenue && d.revenue.citation) onCite(d.revenue.citation)
+    }, (e: ApiError) => setError(e.message))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId, userId])
 
   if (error) return <p className="mx-auto mt-10 max-w-3xl rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{error}</p>

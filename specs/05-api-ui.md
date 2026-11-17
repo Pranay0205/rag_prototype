@@ -89,6 +89,11 @@ who reviewed it and how many claims were checked and removed.
 chips: revenue trend, a facility maturing within 12 months, new key contacts); This week (meetings,
 one colour per client); Clients (revenue TTM and YoY, aliases); Facilities & maturities on a shared
 timeline with the next 12 months shaded. Replaces the meeting sidebar.
+A dismissible "New here? Try" card offers three one-click starting points, each a direct action
+rather than an overlay pointing at the layout:
+- the revenue calculation of the next meeting's client;
+- "Where are we overdue across my clients?" asked in All my clients;
+- the Helios wind-portfolio question asked as Sam, to compare with Kim.
 
 **UI-12 Top bar:** brand (home), a Data link (UI-15) and the profile menu (switch profile, sign out). A
 company search box was tried and removed: the home cards list every covered client, and the chat
