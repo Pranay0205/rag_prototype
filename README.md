@@ -32,6 +32,10 @@ Start with the **New here? Try** card on Home. Then:
 
 More: [docs/DEMO_QUESTIONS.md](docs/DEMO_QUESTIONS.md).
 
+| Home | Ask chat |
+|---|---|
+| ![Home](docs/images/home.png) | ![Ask](docs/images/ask.png) |
+
 ## How it works
 
 ![From client data to a cited answer](docs/images/overview.png)
