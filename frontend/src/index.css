@@ -77,3 +77,22 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .rise, .grow-x, .draw { animation: none; }
 }
+
+/* Scrollbars: thin and warm everywhere; no arrow buttons, no grey track. */
+html,
+body,
+#root * {
+  scrollbar-width: thin;
+  scrollbar-color: #d9d5cc transparent;
+}
+
+/* The prep panel scrolls on its own: its bar stays hidden until the pointer is over it, and a soft
+   fade at the bottom says there is more below instead of a permanent bar. */
+.rail {
+  scrollbar-color: transparent transparent;
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+  padding-bottom: 28px;
+}
+.rail:hover {
+  scrollbar-color: #d9d5cc transparent;
+}
