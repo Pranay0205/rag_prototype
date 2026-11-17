@@ -14,8 +14,9 @@ interface Props {
 }
 
 export function TopBar({ users, me, onHome, onOpenClient, onSwitch, onSignOut }: Props) {
+  // z-30: the blur makes the header its own layer; without it, its menus open behind the page
   return (
-    <header className="flex h-16 shrink-0 items-center gap-6 border-b border-slate-200/70 bg-white/80 px-6 backdrop-blur">
+    <header className="relative z-30 flex h-16 shrink-0 items-center gap-6 border-b border-slate-200/70 bg-white/80 px-6 backdrop-blur">
       <button onClick={onHome} className="flex items-center gap-2.5" title="Home">
         <Logo size={28} />
         <Wordmark />
