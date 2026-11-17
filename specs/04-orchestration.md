@@ -107,7 +107,14 @@ right after ORC-2, before any model call, and stored on `Briefing.key_figures`.
 the same pipeline: ORC-2 facts, ORC-3 retrieval with the question as the query (all document
 types, entitlement-filtered), ORC-5 generation and ORC-6 verification. The question steers
 retrieval but can never widen it (P3); evidence the data lacks comes back as unknowns. Logged
-to `var/runs/ask-*.json` like a briefing (ORC-11).
+to `var/runs/ask-*.json` like a briefing (ORC-11). At most 3 claims, one fact each.
+
+A question asking what to do ("how should I prepare", "what should I raise", "next steps") is
+detected by code, not by the model. The answer is then written as actions. Each action names one
+step followed by the cited fact that calls for it ("Send the proposal before 20 Nov: Raj needs it by
+then [E5]"), and must come from an overdue commitment, a deadline, a request, an open issue or a
+recent change. The judge checks that the stated reason is in the evidence, not whether the advice is
+wise.
 
 **ORC-14 Exhibits.** Structured views built by code from the same tool results and shown inside
 the section they answer: contacts with meeting attendance and new / former status (Client

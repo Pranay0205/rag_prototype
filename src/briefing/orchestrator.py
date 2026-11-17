@@ -839,6 +839,19 @@ ASK_GUIDANCE = (
     "states ONE fact from ONE or two evidence items; do not chain facts with 'and' or 'since'. "
     "If the evidence does not answer it, add an unknown saying what is missing instead of writing a claim."
 )
+# ORC-15: questions asking what to do get actions, each tied to the cited fact that calls for it
+ASK_ACTION_GUIDANCE = (
+    "The banker asks what to do. Write at most 3 claims, most important first. Every claim starts "
+    "with a verb (Send, Raise, Confirm, Bring, Prepare) naming ONE action, then a colon, then the "
+    "cited fact that calls for it, e.g. 'Send the hedging proposal before 20 Nov: Raj needs it by "
+    "then to keep Meridian in the selection [E5].' Only actions that follow from an overdue "
+    "commitment, a deadline, a client request, an open issue or a recent change in the evidence; "
+    "no generic advice. If the evidence gives nothing to act on, add an unknown instead."
+)
+_ACTION_QUESTION = re.compile(
+    r"\b(prepare|prep|should (i|we)|what to (do|raise|bring|ask)|next steps?|recommend|focus on|priorit)",
+    re.IGNORECASE,
+)
 
 
 def answer_question(tools: Tools, user_id: str, client_id: str, question: str) -> dict:
@@ -855,7 +868,14 @@ def answer_question(tools: Tools, user_id: str, client_id: str, question: str) -
     facts = gather(tools, viewer, client_id)  # coverage enforced here (ORC-1)
     context, _ = _context(tools, viewer, facts)
     spec = SectionSpec(
-        SectionKey.ASK, "Answer", question, ASK_GUIDANCE, tuple(facts.groups), (), (question,), k=12
+        SectionKey.ASK,
+        "Answer",
+        question,
+        ASK_ACTION_GUIDANCE if _ACTION_QUESTION.search(question) else ASK_GUIDANCE,
+        tuple(facts.groups),
+        (),
+        (question,),
+        k=12,
     )
     evidence, limited, dropped, warnings = build_evidence(tools, viewer, client_id, spec, facts)
     section, conflicts, unknowns, _, trace = run_section(spec, evidence, context)

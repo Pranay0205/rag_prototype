@@ -4,7 +4,7 @@ import pytest
 
 from briefing import ingest, llm, orchestrator
 from briefing.db import connect
-from briefing.orchestrator import SECTIONS, Evidence, JudgeResult, SectionDraft, run_section
+from briefing.orchestrator import _ACTION_QUESTION, SECTIONS, Evidence, JudgeResult, SectionDraft, run_section
 from briefing.schemas import Citation, ClaimStatus, SectionKey, SourceKind
 from briefing.tools import Tools
 
@@ -324,3 +324,14 @@ def test_ORC_14_conflict_side_from_evidence_not_model(monkeypatch):
     monkeypatch.setattr(llm, "chat_json", fake_llm(draft))
     _, conflicts, *_ = run_section(METRICS, evidence(), CONTEXT)
     assert [v.status for v in conflicts[0].values] == ["current", None]
+
+
+def test_ORC_15_action_questions_get_actions():
+    for q in [
+        "How should I prepare for the Northwind meeting",
+        "What should I raise with Helios?",
+        "Next steps?",
+    ]:
+        assert _ACTION_QUESTION.search(q), q
+    for q in ["Who is the new CFO?", "What is overdue?", "What changed since the last meeting?"]:
+        assert not _ACTION_QUESTION.search(q), q
