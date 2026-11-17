@@ -123,33 +123,42 @@ export function ChatWidget({ userId, clients, currentClientId, onCite }: Props) 
       aria-label="Ask about a client"
       className="rise fixed bottom-6 left-6 z-30 flex h-[620px] max-h-[calc(100vh-7rem)] w-[420px] flex-col overflow-hidden rounded-2xl bg-white shadow-[0_24px_64px_-12px_rgba(15,23,42,0.35)] ring-1 ring-slate-900/10"
     >
-      <header className="flex items-center gap-3 bg-gradient-to-br from-indigo-600 to-violet-600 px-4 py-3 text-white">
-        <span className="grid h-8 w-8 place-items-center rounded-xl bg-white/15">
-          <ChatIcon className="h-4.5 w-4.5" />
+      <header className="flex items-center gap-3 bg-gradient-to-br from-indigo-600 to-violet-600 px-4 py-3.5 text-white">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/15 text-[13px] font-semibold ring-1 ring-white/20">
+          {client ? initials(client.name) : <ChatIcon className="h-5 w-5" />}
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-[11px] font-medium uppercase tracking-wider text-indigo-100">Ask about</span>
-          <select
-            value={clientId ?? ''}
-            onChange={(e) => setClientId(e.target.value || null)}
-            aria-label="Client"
-            className="-ml-1 max-w-full cursor-pointer truncate rounded-md bg-transparent px-1 text-[15px] font-semibold text-white outline-none hover:bg-white/10"
-          >
-            {!clientId && <option value="">Choose a client</option>}
-            {clients.map((c) => (
-              <option key={c.client_id} value={c.client_id} className="text-slate-900">
-                {c.name}
-              </option>
-            ))}
-          </select>
+          {/* a styled pill over the native select: looks like "switch client", keeps native keyboard access */}
+          <span className="relative mt-0.5 inline-flex max-w-full items-center gap-1.5 rounded-lg bg-white/10 py-0.5 pl-2 pr-1.5 transition hover:bg-white/20">
+            <span className="truncate text-[16px] font-semibold leading-tight">{client ? client.name : 'Choose a client'}</span>
+            <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 shrink-0 text-indigo-100" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <path d="M6.5 7.5 10 4l3.5 3.5M6.5 12.5 10 16l3.5-3.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <select
+              value={clientId ?? ''}
+              onChange={(e) => setClientId(e.target.value || null)}
+              aria-label="Client"
+              title="Switch client"
+              className="absolute inset-0 cursor-pointer opacity-0"
+            >
+              {!clientId && <option value="">Choose a client</option>}
+              {clients.map((c) => (
+                <option key={c.client_id} value={c.client_id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </span>
         </span>
         <button
           onClick={() => setOpen(false)}
-          aria-label="Close chat"
-          className="grid h-8 w-8 place-items-center rounded-full text-indigo-100 transition hover:bg-white/15 hover:text-white"
+          aria-label="Minimize chat"
+          title="Minimize"
+          className="grid h-8 w-8 shrink-0 place-items-center self-start rounded-full text-indigo-100 transition hover:bg-white/15 hover:text-white"
         >
           <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
-            <path d="M5 8l5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M5 10h10" strokeLinecap="round" />
           </svg>
         </button>
       </header>
@@ -296,6 +305,14 @@ function Answer({ turn: t, onCite }: { turn: Turn; onCite: (c: Citation) => void
       </p>
     </div>
   )
+}
+
+function initials(name: string): string {
+  return shortName(name)
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 2)
 }
 
 function shortName(name: string): string {
