@@ -27,6 +27,9 @@ _IS_OPENROUTER = "openrouter.ai" in BASE_URL
 # Model slugs from https://openrouter.ai/models (verified available 2026-11-16).
 MODEL = os.environ.get("LLM_MODEL") or "anthropic/claude-sonnet-5.5"
 MODEL_FAST = os.environ.get("LLM_MODEL_FAST") or "anthropic/claude-haiku-5.5"
+# EVAL-5 grader. A different model (or mode) from the writer, so the eval does not share the
+# writer's blind spots; speed does not matter offline.
+MODEL_EVAL = os.environ.get("LLM_MODEL_EVAL") or MODEL_FAST
 # OPENROUTER_API_KEY is the standard name; LLM_API_KEY covers non-OpenRouter endpoints.
 API_KEY = os.environ.get("OPENROUTER_API_KEY") or os.environ.get("LLM_API_KEY")
 
@@ -50,6 +53,7 @@ def chat_json[T: BaseModel](
     fast: bool = False,
     retries: int = 1,
     temperature: float = 0.0,
+    model: str | None = None,
 ) -> T:
     """Call the model in JSON mode and validate the reply against `schema`.
 
@@ -61,7 +65,7 @@ def chat_json[T: BaseModel](
             "OPENROUTER_API_KEY is not set. Create a key at https://openrouter.ai/keys "
             "and put it in .env (see .env.example)."
         )
-    model = MODEL_FAST if fast else MODEL
+    model = model or (MODEL_FAST if fast else MODEL)
     messages = [
         {
             "role": "system",

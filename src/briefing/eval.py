@@ -169,7 +169,7 @@ def judge(b: Briefing, facts: list[str], forbidden: list[str]) -> Judgement:
         + "EXPECTED FACTS:\n" + "\n".join(f"F{i}: {f}" for i, f in enumerate(facts)) + "\n\n"
         + "FORBIDDEN STATEMENTS:\n" + "\n".join(f"A{i}: {a}" for i, a in enumerate(forbidden))
     )  # fmt: skip
-    return llm.chat_json(prompts.EVAL_JUDGE_SYSTEM, user, Judgement, fast=True)
+    return llm.chat_json(prompts.EVAL_JUDGE_SYSTEM, user, Judgement, model=llm.MODEL_EVAL)
 
 
 def map_verdicts(j: Judgement, n: int) -> tuple[list[str], bool]:
@@ -556,7 +556,7 @@ def main() -> int:
     report = {
         "run_id": run_id,
         "model": llm.MODEL,
-        "judge_model": llm.MODEL_FAST,
+        "judge_model": llm.MODEL_EVAL,
         "repeat": args.repeat,
         "unit": unit,
         "metrics": [{"id": m[0], "name": m[1], "result": m[2], "pass": m[3], "gate": m[4]} for m in metrics],

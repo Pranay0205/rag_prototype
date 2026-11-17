@@ -13,7 +13,7 @@ release gate.
 |---|---|---|---|
 | L1 Unit | Ingestion, tools, verifier rules | pytest, deterministic | No |
 | L2 Trap suite | T1–T11 from `golden/traps.yaml` | Checks on ingestion output, tool results and generated briefings | No (string/ID checks) |
-| L3 Briefing quality | Golden answers per client | Fact recall vs `golden/*.yaml` | Fast-model judge, with must/must-not string checks |
+| L3 Briefing quality | Golden answers per client | Fact recall vs `golden/*.yaml` | Judge model `LLM_MODEL_EVAL` (a different model or mode from the writer, e.g. deepseek-reasoner), with must/must-not string checks |
 | L4 Red team | Adversarial cases | Injection, entitlement probing, ambiguous names, no-data client | Mixed |
 
 ## Metrics and release gates
