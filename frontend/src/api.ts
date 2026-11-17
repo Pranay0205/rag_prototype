@@ -108,6 +108,7 @@ export interface HomeData {
     yoy_pct: number | null
     next_meeting_id: string | null
     last_prepared: string | null
+    new_contacts: { name: string; title: string; since: string }[]
   }[]
   facilities: {
     client_id: string

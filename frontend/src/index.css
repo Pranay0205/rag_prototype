@@ -2,6 +2,35 @@
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* Design: warm neutrals (ink on stone) instead of cool slate. Every slate-* class follows. */
+  --color-slate-50: #faf9f7;
+  --color-slate-100: #f1efea;
+  --color-slate-200: #e6e3dc;
+  --color-slate-300: #d9d5cc;
+  --color-slate-400: #a19c91;
+  --color-slate-500: #6f6a61;
+  --color-slate-600: #5f5b53;
+  --color-slate-700: #3d3a34;
+  --color-slate-800: #26231f;
+  --color-slate-900: #1a1814;
+  --color-slate-950: #0e0d0b;
+
+  /* Design: one teal accent instead of indigo / violet. */
+  --color-indigo-50: #f0fdfa;
+  --color-indigo-100: #ccfbf1;
+  --color-indigo-200: #99f6e4;
+  --color-indigo-300: #5eead4;
+  --color-indigo-400: #2dd4bf;
+  --color-indigo-500: #14b8a6;
+  --color-indigo-600: #0f766e;
+  --color-indigo-700: #0f5f56;
+  --color-indigo-800: #115e59;
+  --color-indigo-900: #134e4a;
+  --color-indigo-950: #042f2e;
+  --color-violet-500: #14b8a6;
+  --color-violet-600: #0f766e;
+  --color-violet-700: #0f5f56;
 }
 
 html,
@@ -11,7 +40,9 @@ body,
 }
 
 body {
-  @apply bg-slate-50 text-slate-800 antialiased;
+  @apply text-slate-900 antialiased;
+  background: #f6f5f2;
+  font-feature-settings: 'cv11' 1;
 }
 
 @keyframes shimmer {

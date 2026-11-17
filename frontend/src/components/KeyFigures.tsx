@@ -1,6 +1,6 @@
 // ORC-13 / UI-3: headline cards computed by code from the database. They arrive before any model
 // call, so the page has real numbers within a second. Click a card to open the rows behind it.
-import { useEffect, useId, useState, type ReactNode } from 'react'
+import { useEffect, useId, useState } from 'react'
 import type { Citation, KeyFigure } from '../types'
 import { CARD, cn } from './ui'
 
@@ -11,17 +11,10 @@ interface Props {
 }
 
 const TONE = {
-  good: { text: 'text-emerald-600', stroke: '#10b981', soft: 'bg-emerald-50 text-emerald-600' },
-  bad: { text: 'text-rose-600', stroke: '#f43f5e', soft: 'bg-rose-50 text-rose-600' },
-  warn: { text: 'text-amber-600', stroke: '#f59e0b', soft: 'bg-amber-50 text-amber-600' },
-  neutral: { text: 'text-slate-500', stroke: '#6366f1', soft: 'bg-indigo-50 text-indigo-600' },
-}
-
-const ICONS: Record<string, ReactNode> = {
-  revenue: <path d="M3 14.5 7.5 10l3 3L17 6.5M12.5 6.5H17V11" />,
-  facility: <path d="M3 8 10 3.5 17 8M4.5 8v7.5M8 8v7.5M12 8v7.5M15.5 8v7.5M3 16.5h14" />,
-  pipeline: <path d="M3 4.5h14l-5.25 6.25V16l-3.5-1.75v-3.5L3 4.5Z" />,
-  actions: <path d="M8 5.5h9M8 10h9M8 14.5h9M3.5 5.5l1 1 1.75-2M3.5 10l1 1 1.75-2M3.5 14.5l1 1 1.75-2" />,
+  good: { text: 'text-emerald-600', stroke: '#10b981' },
+  bad: { text: 'text-rose-600', stroke: '#f43f5e' },
+  warn: { text: 'text-amber-600', stroke: '#f59e0b' },
+  neutral: { text: 'text-slate-600', stroke: '#14b8a6' },
 }
 
 export function KeyFigures({ figures, loading, onCite }: Props) {
@@ -58,22 +51,23 @@ function FigureCard({ figure, index, onCite }: { figure: KeyFigure; index: numbe
       disabled={!first}
       title={first ? 'Open the database rows behind this number' : undefined}
       style={{ animationDelay: `${index * 70}ms` }}
-      className={cn(CARD, 'rise group relative flex min-h-[118px] flex-col overflow-hidden p-4 text-left transition duration-300 hover:-translate-y-0.5 hover:ring-indigo-200')}
+      className={cn(CARD, 'rise group relative flex min-h-[118px] flex-col overflow-hidden rounded-xl p-4 text-left transition duration-300 hover:border-slate-300')}
     >
-      <div className="flex items-center gap-2">
-        <span className={cn('grid h-6 w-6 shrink-0 place-items-center rounded-lg', tone.soft)}>
-          <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            {ICONS[figure.key] ?? ICONS.revenue}
-          </svg>
-        </span>
-        <span className="line-clamp-2 text-[12px] font-medium leading-tight text-slate-500">{figure.label}</span>
-      </div>
+      <span className="line-clamp-2 text-[13px] leading-tight text-slate-600">{figure.label}</span>
 
-      <div className="mt-3 text-[26px] font-semibold leading-none tracking-tight text-slate-900 tabular-nums">
+      <div className="mt-2 text-[26px] font-bold leading-none tracking-tight text-slate-900 tabular-nums">
         <CountUp value={figure.value} />
       </div>
 
-      <div className={cn('mt-2 flex items-start gap-1 text-[12px] font-medium leading-snug', tone.text)}>
+      {/* warnings read as pills (matures soon, overdue); trends as coloured text */}
+      <div
+        className={cn(
+          'mt-2 flex items-start gap-1 text-[13px] font-medium leading-snug',
+          !delta && (figure.tone === 'warn' || figure.tone === 'bad')
+            ? cn('self-start rounded-full px-2 py-0.5 text-[12px] font-semibold', figure.tone === 'warn' ? 'bg-amber-50 text-amber-800' : 'bg-rose-50 text-rose-800')
+            : tone.text,
+        )}
+      >
         {delta && (
           <svg viewBox="0 0 20 20" className="mt-px h-3.5 w-3.5 shrink-0" fill="currentColor" aria-hidden="true">
             {figure.detail.startsWith('-') ? <path d="M10 15 4 7h12l-6 8Z" /> : <path d="M10 5l6 8H4l6-8Z" />}
@@ -86,7 +80,7 @@ function FigureCard({ figure, index, onCite }: { figure: KeyFigure; index: numbe
         <div className="mt-auto flex items-center gap-2 pt-3" role="img" aria-label={`${figure.bar_pct}% utilized`}>
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
             <div
-              className="grow-x h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500"
+              className="grow-x h-full rounded-full bg-indigo-500"
               style={{ width: `${Math.min(100, figure.bar_pct)}%` }}
             />
           </div>

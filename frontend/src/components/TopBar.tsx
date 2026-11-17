@@ -8,20 +8,40 @@ interface Props {
   users: User[]
   me: User | undefined
   onHome: () => void
+  crumb?: string | null // the open client, shown as Home > Client
   onSwitch: (userId: string) => void
   onSignOut: () => void
 }
 
-export function TopBar({ users, me, onHome, onSwitch, onSignOut }: Props) {
-  // z-30: the blur makes the header its own layer; without it, its menus open behind the page
+export function TopBar({ users, me, onHome, crumb, onSwitch, onSignOut }: Props) {
+  // z-30 keeps the profile menu above the page content
   return (
-    <header className="relative z-30 flex h-16 shrink-0 items-center gap-6 border-b border-slate-200/70 bg-white/80 px-6 backdrop-blur">
-      <button onClick={onHome} className="flex items-center gap-2.5" title="Home">
-        <Logo size={28} />
-        <Wordmark />
-      </button>
-      <div className="flex-1" />
-      {me && <ProfileMenu users={users} me={me} onSwitch={onSwitch} onSignOut={onSignOut} />}
+    <header className="relative z-30 shrink-0 border-b border-slate-200 bg-white">
+      <div className="mx-auto flex h-16 max-w-[1320px] items-center justify-between gap-4 px-6">
+        <div className="flex min-w-0 items-center gap-4">
+          <button onClick={onHome} className="flex items-center gap-2.5" title="Home">
+            <Logo size={32} />
+            <Wordmark />
+          </button>
+          {crumb && (
+            <nav aria-label="Breadcrumb" className="truncate text-[14px] text-slate-600">
+              <span aria-hidden="true" className="mr-3 text-slate-300">
+                /
+              </span>
+              <button onClick={onHome} className="hover:text-slate-900">
+                Home
+              </button>
+              <span aria-hidden="true" className="mx-2">
+                ›
+              </span>
+              <span aria-current="page" className="font-medium text-slate-900">
+                {crumb}
+              </span>
+            </nav>
+          )}
+        </div>
+        {me && <ProfileMenu users={users} me={me} onSwitch={onSwitch} onSignOut={onSignOut} />}
+      </div>
     </header>
   )
 }

@@ -1,7 +1,7 @@
 // UI-3 section card, UI-6 claim review, sources with exact quotes (UI-4).
 import { useState, type ReactNode } from 'react'
 import type { Citation, Claim, Section } from '../types'
-import { CARD, CardHeader, VerifiedPill, cn, readable } from './ui'
+import { CARD, VerifiedPill, cn, readable } from './ui'
 
 export type RejectReason = 'wrong' | 'outdated' | 'not_relevant'
 export interface Review {
@@ -17,7 +17,6 @@ const REASONS: { key: RejectReason; label: string; icon: ReactNode }[] = [
 
 interface Props {
   title: string
-  icon: ReactNode
   exhibit?: ReactNode // ORC-14 structured view, shown above the claims as soon as it arrives
   section?: Section
   reviews: Record<string, Review>
@@ -25,18 +24,13 @@ interface Props {
   onCite: (citation: Citation) => void
 }
 
-export function SectionCard({ title, icon, exhibit, section, reviews, onReview, onCite }: Props) {
+export function SectionCard({ title, exhibit, section, reviews, onReview, onCite }: Props) {
   const verified = section?.claims.filter((c) => c.status === 'verified').length ?? 0
   return (
-    <section className={cn(CARD, 'p-6')}>
-      <div className="mb-3">
-        <CardHeader
-          icon={icon}
-          title={title}
-          right={
-            section && <VerifiedPill confidence={section.confidence} verified={verified} total={section.claims.length} />
-          }
-        />
+    <section className={cn(CARD, 'px-6 pb-2 pt-1')}>
+      <div className="flex flex-wrap items-center justify-between gap-3 py-4">
+        <h2 className="text-[18px] font-semibold tracking-tight text-slate-900">{title}</h2>
+        {section && <VerifiedPill confidence={section.confidence} verified={verified} total={section.claims.length} />}
       </div>
 
       {exhibit}
@@ -49,7 +43,7 @@ export function SectionCard({ title, icon, exhibit, section, reviews, onReview, 
       {section && section.claims.length === 0 && section.warnings.length === 0 && (
         <p className="text-sm text-slate-400">Nothing supported by the evidence.</p>
       )}
-      <ul className="divide-y divide-slate-100">
+      <ul>
         {section?.claims.map((claim) => (
           <ClaimRow key={claim.id} claim={claim} review={reviews[claim.id]} onReview={onReview} onCite={onCite} />
         ))}
@@ -129,34 +123,32 @@ function ClaimRow({
   const n = claim.citations.length
 
   return (
-    <li className="group group/claim flex gap-4 py-3.5">
-      <div className="min-w-0 flex-1">
+    <li className="group/claim flex flex-wrap gap-4 border-t border-slate-100 py-5">
+      <div className="min-w-0 flex-[1_1_420px]">
         <p
           className={cn(
-            'text-[14.5px] leading-relaxed text-slate-700',
+            'text-[15px] leading-[1.65] text-slate-800',
             rejected && 'text-slate-400 line-through decoration-slate-300',
           )}
         >
           <ClaimText claim={claim} onCite={onCite} after={<VerificationTag status={claim.status} />} />
         </p>
 
-        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <p className="mt-2 text-[13px] text-slate-600">
+          {n} {n === 1 ? 'source' : 'sources'} · {claim.citations[0]?.title}
+          {n > 1 && ` +${n - 1}`} ·{' '}
           <button
             onClick={() => setSourcesOpen((v) => !v)}
             aria-expanded={sourcesOpen}
-            className="inline-flex items-center gap-1 text-[11.5px] font-medium text-slate-400 transition hover:text-indigo-600"
+            className="font-medium text-indigo-700 hover:underline"
           >
-            <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.6">
-              <path d="M3 6.5 10 3l7 3.5-7 3.5-7-3.5Z" />
-              <path d="m3 10 7 3.5 7-3.5M3 13.5 10 17l7-3.5" />
-            </svg>
-            {sourcesOpen ? 'Hide sources' : `${n} ${n === 1 ? 'source' : 'sources'}`}
+            {sourcesOpen ? 'Hide quotes' : n === 1 ? 'View quote' : 'View quotes'}
           </button>
-        </div>
+        </p>
 
         {askReason && (
           <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-            <span className="mr-1 text-[12px] text-slate-500">Why reject?</span>
+            <span className="mr-1 text-[13px] text-slate-600">What is wrong with it?</span>
             {REASONS.map((r) => (
               <button
                 key={r.key}
@@ -183,55 +175,69 @@ function ClaimRow({
 
       {/* UI-6 human review: words, not icons, so it never reads as the system's verification */}
       {onReview && (
-        <div className="w-[164px] shrink-0 pt-0.5 text-right">
+        <div className="flex shrink-0 items-start gap-2">
           {review ? (
-            <button
-              onClick={() => onReview(claim, null)}
-              title="Click to undo your review"
-              className={cn(
-                'group/pill inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[12px] font-medium ring-1 ring-inset transition',
-                accepted
-                  ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
-                  : 'bg-rose-50 text-rose-700 ring-rose-200',
-              )}
-            >
-              <span className="group-hover/pill:hidden">
-                {accepted ? 'Accepted' : `Rejected${reason ? ` · ${reason.label}` : ''}`}
+            <>
+              <span
+                className={cn(
+                  'inline-flex h-10 items-center gap-1.5 rounded-[10px] px-3 text-[14px] font-medium',
+                  accepted ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800',
+                )}
+              >
+                {accepted ? (
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M5 12l5 5L20 7" />
+                  </svg>
+                ) : (
+                  <FlagIcon />
+                )}
+                {accepted ? 'Accepted' : `Flagged${reason ? ` · ${reason.label}` : ''}`}
               </span>
-              <span className="hidden group-hover/pill:inline">Undo</span>
-            </button>
+              <button
+                onClick={() => onReview(claim, null)}
+                className="h-10 rounded-[10px] px-3 text-[14px] text-slate-600 transition hover:bg-slate-100"
+              >
+                Undo
+              </button>
+            </>
           ) : (
-            <span
-              className={cn(
-                'inline-flex gap-1 transition',
-                askReason ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100',
-              )}
-            >
+            <>
               <button
                 onClick={() => {
                   setAskReason(false)
                   onReview(claim, { decision: 'accept' })
                 }}
-                className="rounded-full px-2.5 py-1 text-[12px] font-medium text-slate-600 ring-1 ring-slate-200 transition hover:bg-emerald-50 hover:text-emerald-700 hover:ring-emerald-200"
+                className="inline-flex h-10 items-center gap-1.5 rounded-[10px] border border-slate-300 bg-white px-3.5 text-[14px] font-medium text-slate-900 transition hover:bg-slate-100"
               >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M5 12l5 5L20 7" />
+                </svg>
                 Accept
               </button>
               <button
                 onClick={() => setAskReason((v) => !v)}
+                aria-label="Flag claim for correction"
+                title="Flag claim for correction"
                 className={cn(
-                  'rounded-full px-2.5 py-1 text-[12px] font-medium ring-1 transition',
-                  askReason
-                    ? 'bg-rose-50 text-rose-700 ring-rose-200'
-                    : 'text-slate-600 ring-slate-200 hover:bg-rose-50 hover:text-rose-700 hover:ring-rose-200',
+                  'grid h-10 w-10 place-items-center rounded-[10px] border transition',
+                  askReason ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-100',
                 )}
               >
-                Reject
+                <FlagIcon />
               </button>
-            </span>
+            </>
           )}
         </div>
       )}
     </li>
+  )
+}
+
+function FlagIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 21V4h12l-2 4 2 4H5" />
+    </svg>
   )
 }
 

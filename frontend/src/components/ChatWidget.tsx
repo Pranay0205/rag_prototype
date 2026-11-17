@@ -19,12 +19,14 @@ type Turn = { id: number; question: string; answer?: AskAnswer; error?: string; 
 interface Props {
   userId: string
   clients: { client_id: string; name: string }[]
-  currentClientId: string | null // the briefing on screen, if any
+  currentClientId: string | null // the briefing on screen, or the client asked about
+  open: boolean // opened by the "Ask about ..." buttons
+  onOpenChange: (open: boolean) => void
   onCite: (c: Citation) => void
 }
 
-export function ChatWidget({ userId, clients, currentClientId, onCite }: Props) {
-  const [open, setOpen] = useState(false)
+export function ChatWidget({ userId, clients, currentClientId, open, onOpenChange, onCite }: Props) {
+  const setOpen = onOpenChange
   const [clientId, setClientId] = useState<string | null>(currentClientId)
   const [threads, setThreads] = useState<Record<string, Turn[]>>({})
   const [text, setText] = useState('')
@@ -105,17 +107,7 @@ export function ChatWidget({ userId, clients, currentClientId, onCite }: Props) 
     }
   }
 
-  if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-30 inline-flex items-center gap-2.5 rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 py-3 pl-4 pr-5 text-sm font-semibold text-white shadow-[0_12px_32px_-8px_rgba(79,70,229,0.6)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_40px_-8px_rgba(79,70,229,0.7)]"
-      >
-        <ChatIcon className="h-5 w-5" />
-        {client ? `Ask about ${shortName(client.name)}` : 'Ask'}
-      </button>
-    )
-  }
+  if (!open) return null
 
   return (
     <section
@@ -123,19 +115,19 @@ export function ChatWidget({ userId, clients, currentClientId, onCite }: Props) 
       aria-label="Ask about a client"
       className="rise fixed bottom-6 right-6 z-30 flex h-[620px] max-h-[calc(100vh-7rem)] w-[420px] flex-col overflow-hidden rounded-2xl bg-white shadow-[0_24px_64px_-12px_rgba(15,23,42,0.35)] ring-1 ring-slate-900/10"
     >
-      <header className="flex items-center gap-3 bg-gradient-to-br from-indigo-600 to-violet-600 px-4 py-3.5 text-white">
+      <header className="flex items-center gap-3 bg-slate-900 px-4 py-3.5 text-white">
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/15 text-[13px] font-semibold ring-1 ring-white/20">
           {client ? initials(client.name) : <ChatIcon className="h-5 w-5" />}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-[11px] font-medium uppercase tracking-wider text-indigo-100">Ask about</span>
+          <span className="block text-[11px] font-medium uppercase tracking-wider text-slate-300">Ask about</span>
           <ClientPicker clients={clients} value={clientId} onChange={setClientId} />
         </span>
         <button
           onClick={() => setOpen(false)}
           aria-label="Minimize chat"
           title="Minimize"
-          className="grid h-8 w-8 shrink-0 place-items-center self-start rounded-full text-indigo-100 transition hover:bg-white/15 hover:text-white"
+          className="grid h-8 w-8 shrink-0 place-items-center self-start rounded-full text-slate-300 transition hover:bg-white/15 hover:text-white"
         >
           <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
             <path d="M5 10h10" strokeLinecap="round" />
@@ -146,7 +138,7 @@ export function ChatWidget({ userId, clients, currentClientId, onCite }: Props) 
       <div ref={scroller} className="flex-1 space-y-4 overflow-y-auto bg-slate-50/60 px-4 py-4">
         {pending && (
           <div className="flex justify-end">
-            <p className="max-w-[85%] rounded-2xl rounded-br-md bg-indigo-600 px-3.5 py-2 text-[13.5px] leading-snug text-white">
+            <p className="max-w-[85%] rounded-2xl rounded-br-md bg-slate-900 px-3.5 py-2 text-[13.5px] leading-snug text-white">
               {pending}
             </p>
           </div>
@@ -195,7 +187,7 @@ export function ChatWidget({ userId, clients, currentClientId, onCite }: Props) 
         {turns.map((t) => (
           <div key={t.id} className="space-y-2">
             <div className="flex justify-end">
-              <p className="max-w-[85%] rounded-2xl rounded-br-md bg-indigo-600 px-3.5 py-2 text-[13.5px] leading-snug text-white">
+              <p className="max-w-[85%] rounded-2xl rounded-br-md bg-slate-900 px-3.5 py-2 text-[13.5px] leading-snug text-white">
                 {t.question}
               </p>
             </div>
@@ -232,7 +224,7 @@ export function ChatWidget({ userId, clients, currentClientId, onCite }: Props) 
           type="submit"
           disabled={!text.trim() || busy}
           aria-label="Send"
-          className="grid h-10 w-10 place-items-center rounded-xl bg-indigo-600 text-white transition hover:bg-indigo-500 disabled:opacity-40"
+          className="grid h-10 w-10 place-items-center rounded-xl bg-slate-900 text-white transition hover:bg-slate-800 disabled:opacity-40"
         >
           <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <path d="M4 10h11m-4.5-4.5L15 10l-4.5 4.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -330,7 +322,7 @@ function ClientPicker({
         className="inline-flex max-w-full items-center gap-1.5 rounded-lg bg-white/10 py-0.5 pl-2 pr-1.5 text-left transition hover:bg-white/20"
       >
         <span className="truncate text-[16px] font-semibold leading-tight">{current ? current.name : 'Choose a client'}</span>
-        <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 shrink-0 text-indigo-100" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+        <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 shrink-0 text-slate-300" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
           <path d="M6.5 7.5 10 4l3.5 3.5M6.5 12.5 10 16l3.5-3.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>

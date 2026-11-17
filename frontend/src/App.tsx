@@ -12,7 +12,7 @@ import { SectionCard, type RejectReason, type Review } from './components/Sectio
 import { SignIn } from './components/SignIn'
 import { SourceDrawer } from './components/SourceDrawer'
 import { TopBar } from './components/TopBar'
-import { GLYPH, Logo, SECTION_ORDER, Spinner, cn, formatMeetingTime, readable } from './components/ui'
+import { CARD, ClientTile, Logo, SECTION_ORDER, Spinner, cn, formatMeetingTime, readable, shortTitle } from './components/ui'
 import {
   NO_EXHIBITS,
   type Briefing,
@@ -78,6 +78,8 @@ export default function App() {
   const [actionIds, setActionIds] = useState<Record<string, string>>({}) // suggestion id -> saved action id
   const [mine, setMine] = useState<ClientAction[]>([]) // the viewer's own actions for this client
   const [drawer, setDrawer] = useState<Citation | null>(null)
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatClient, setChatClient] = useState<string | null>(null) // client asked about from Home
   const [history, setHistory] = useState<HistoryItem[]>([])
   const [copied, setCopied] = useState(false)
   const closeStream = useRef<(() => void) | null>(null)
@@ -170,6 +172,12 @@ export default function App() {
     window.history.pushState(null, '', '#/')
     closeStream.current?.()
     setMeeting(null)
+  }
+
+  /** "Ask about ..." buttons open the chat on that client. */
+  function askAbout(clientId: string) {
+    setChatClient(clientId)
+    setChatOpen(true)
   }
 
   /** Search and the dashboard open a client through its next meeting (every covered client has one). */
@@ -307,6 +315,7 @@ export default function App() {
         users={users}
         me={me}
         onHome={goHome}
+        crumb={meeting ? meeting.legal_name.replace(/ (Inc\.|plc|LLC)$/, '') : null}
         onSwitch={setUserId}
         onSignOut={() => setUserId(null)}
       />
@@ -321,6 +330,7 @@ export default function App() {
               if (m) openMeeting(m)
             }}
             onOpenClient={openClient}
+            onAsk={askAbout}
           />
         )}
 
@@ -328,25 +338,10 @@ export default function App() {
           <div
             className={cn(
               'mx-auto px-6 py-8',
-              rails ? 'grid max-w-[1560px] items-start gap-6 xl:grid-cols-[300px_minmax(0,1fr)_340px]' : 'max-w-3xl',
+              rails ? 'flex max-w-[1320px] flex-wrap items-start gap-8' : 'max-w-3xl',
             )}
           >
-            {rails && (
-              <aside className="xl:sticky xl:top-8 xl:max-h-[calc(100vh-8rem)] xl:overflow-y-auto">
-                <AttentionPanel
-                  briefing={run.briefing}
-                  running={run.status === 'running'}
-                  actionStates={ticked}
-                  onAction={act}
-                  onCite={setDrawer}
-                  side="left"
-                  mine={ownItems}
-                  onRemoveMine={(id) => api.deleteAction(id, userId).then(refreshMine)}
-                  onAdd={addItem}
-                />
-              </aside>
-            )}
-            <main className="min-w-0">
+            <main className="min-w-0 flex-[999_1_600px]">
               <MeetingHeader
                 meeting={meeting}
                 run={run}
@@ -359,7 +354,7 @@ export default function App() {
                 total={allClaims.length}
                 history={history}
                 onOpenVersion={(id) => openSaved(meeting, id)}
-                onBack={goHome}
+                onAsk={() => askAbout(meeting.client_id)}
               />
 
               {view === 'notes' ? (
@@ -371,13 +366,12 @@ export default function App() {
                   )}
                   {run.status === 'idle' && <IdleState onPrepare={prepare} />}
                   {run.status !== 'idle' && (
-                    <div className="space-y-5">
+                    <div className="space-y-6">
                       <KeyFigures figures={run.figures} loading={run.status === 'running'} onCite={setDrawer} />
                       {SECTION_ORDER.map((s) => (
                         <SectionCard
                           key={s.key}
                           title={s.title}
-                          icon={GLYPH[s.key]}
                           exhibit={
                             s.key === 'client_overview' ? (
                               <ContactsExhibit exhibits={run.exhibits} onCite={setDrawer} />
@@ -399,16 +393,19 @@ export default function App() {
               )}
             </main>
             {rails && (
-              <aside className="xl:sticky xl:top-8 xl:max-h-[calc(100vh-8rem)] xl:overflow-y-auto xl:pb-24">
+              // one prep panel: stays in view while reading, its own quiet scroll, no competing columns
+              <div className="rail max-w-full flex-[1_1_360px] min-[1100px]:sticky min-[1100px]:top-6 min-[1100px]:max-h-[calc(100vh-7rem)] min-[1100px]:overflow-y-auto">
                 <AttentionPanel
                   briefing={run.briefing}
                   running={run.status === 'running'}
-                  actionStates={actionStates}
+                  actionStates={ticked}
                   onAction={act}
                   onCite={setDrawer}
-                  side="right"
+                  mine={ownItems}
+                  onRemoveMine={(id) => api.deleteAction(id, userId).then(refreshMine)}
+                  onAdd={addItem}
                 />
-              </aside>
+              </div>
             )}
           </div>
         )}
@@ -417,7 +414,9 @@ export default function App() {
       <ChatWidget
         userId={userId}
         clients={[...new Map(meetings.map((m) => [m.client_id, { client_id: m.client_id, name: m.legal_name }])).values()]}
-        currentClientId={meeting?.client_id ?? null}
+        currentClientId={chatClient ?? meeting?.client_id ?? null}
+        open={chatOpen}
+        onOpenChange={setChatOpen}
         onCite={setDrawer}
       />
 
@@ -438,7 +437,7 @@ function MeetingHeader({
   total,
   history,
   onOpenVersion,
-  onBack,
+  onAsk,
 }: {
   meeting: Meeting
   run: Run
@@ -451,111 +450,127 @@ function MeetingHeader({
   total: number
   history: HistoryItem[]
   onOpenVersion: (briefingId: string) => void
-  onBack: () => void
+  onAsk: () => void
 }) {
   const done = Object.keys(run.sections).length
   const allReviewed = total > 0 && reviewed === total
+  const short = meeting.legal_name.replace(/ (Inc\.|plc|LLC)$/, '')
   return (
-    <header className="mb-8">
-      <button
-        onClick={onBack}
-        className="-ml-2 mb-4 inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[13px] font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
-      >
-        <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-          <path d="M12.5 4.5 7 10l5.5 5.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        Home
-      </button>
-      <div className="text-[13px] font-medium text-indigo-600">{formatMeetingTime(meeting.start_time)}</div>
-      <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-900">{meeting.legal_name}</h1>
-      <p className="mt-1.5 text-[15px] text-slate-500">{meeting.purpose}</p>
-      <Attendees names={meeting.client_attendees} contacts={run.exhibits.contacts} />
+    <header className="mb-6">
+      <div className="flex flex-wrap items-start gap-5">
+        <ClientTile clientId={meeting.client_id} name={meeting.legal_name} size="lg" />
+        <div className="min-w-0 flex-[1_1_360px]">
+          <p className="text-[13px] text-slate-600">
+            <strong className="font-semibold text-slate-900">{formatMeetingTime(meeting.start_time)}</strong> ·{' '}
+            {meeting.purpose}
+          </p>
+          <h1 className="mt-1.5 text-[30px] font-bold leading-tight tracking-tight text-slate-900">
+            {meeting.legal_name}
+          </h1>
+          <Attendees names={meeting.client_attendees} contacts={run.exhibits.contacts} />
+        </div>
+        <div className="flex gap-2">
+          {run.status === 'done' && (
+            <button
+              onClick={onCopy}
+              title={copied ? 'Copied' : allReviewed ? 'Copy the reviewed briefing' : 'Copy as markdown (rejected claims left out)'}
+              aria-label="Copy briefing"
+              className="grid h-11 w-11 place-items-center rounded-[10px] border border-slate-300 bg-white text-slate-700 transition hover:bg-slate-100"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                {copied ? (
+                  <path d="M5 12l5 5L20 7" />
+                ) : (
+                  <>
+                    <rect x="9" y="9" width="12" height="12" rx="2" />
+                    <path d="M5 15V5a2 2 0 0 1 2-2h8" />
+                  </>
+                )}
+              </svg>
+            </button>
+          )}
+          <button
+            onClick={onAsk}
+            className="inline-flex h-11 items-center gap-2 rounded-[10px] border border-slate-300 bg-white px-4 text-[14px] font-medium text-slate-900 transition hover:bg-slate-100"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" />
+            </svg>
+            Ask about {short}
+          </button>
+        </div>
+      </div>
 
-      <div className="mt-6 flex items-center justify-between">
-        <div className="inline-flex rounded-full bg-slate-100 p-1 text-sm">
+      <div className="mt-6 flex flex-wrap items-end justify-between gap-3 border-b border-slate-200">
+        <div role="tablist" aria-label="Briefing views" className="flex gap-6">
           {(['briefing', 'notes'] as const).map((v) => (
             <button
               key={v}
+              role="tab"
+              aria-selected={view === v}
               onClick={() => onView(v)}
               className={cn(
-                'inline-flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-1.5 font-medium transition',
-                view === v ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800',
+                '-mb-px inline-flex h-11 items-center gap-2 border-b-2 text-[14px] transition',
+                view === v ? 'border-slate-900 font-semibold text-slate-900' : 'border-transparent font-medium text-slate-600 hover:text-slate-900',
               )}
             >
               {v === 'briefing' ? 'Briefing' : 'After the meeting'}
-              {v === 'briefing' && run.status === 'done' && <ReviewProgress reviewed={reviewed} total={total} />}
+              {v === 'briefing' && run.status === 'done' && total > 0 && (
+                <span className={cn('text-[12px] font-medium tabular-nums', allReviewed ? 'text-emerald-700' : 'text-slate-500')}>
+                  {allReviewed ? 'All reviewed' : `${reviewed}/${total} reviewed`}
+                </span>
+              )}
             </button>
           ))}
         </div>
-
-        <div className="flex items-center gap-2 whitespace-nowrap">
+        <div className="flex items-center gap-1 pb-1">
           {run.status === 'done' && view === 'briefing' && (
-            <>
-              <HistoryMenu
-                label={run.savedAt ? `Prepared ${timeAgo(run.savedAt)}` : `Prepared in ${run.seconds?.toFixed(1)}s`}
-                items={history}
-                currentId={run.briefingId}
-                onOpen={onOpenVersion}
-              />
-              <button
-                onClick={onCopy}
-                title={
-                  copied
-                    ? 'Copied'
-                    : allReviewed
-                      ? 'Copy the reviewed briefing as markdown'
-                      : 'Copy as markdown (rejected claims left out)'
-                }
-                aria-label="Copy briefing"
-                className={cn(
-                  'grid h-8 w-8 place-items-center rounded-full transition',
-                  copied || allReviewed
-                    ? 'text-emerald-600 hover:bg-emerald-50'
-                    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800',
-                )}
-              >
-                <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.7">
-                  {copied ? (
-                    <path d="M5 10.5 8.5 14 15 6" strokeLinecap="round" strokeLinejoin="round" />
-                  ) : (
-                    <path d="M7 7V4.5A1.5 1.5 0 0 1 8.5 3h7A1.5 1.5 0 0 1 17 4.5v7a1.5 1.5 0 0 1-1.5 1.5H13M4.5 7h7A1.5 1.5 0 0 1 13 8.5v7a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 3 15.5v-7A1.5 1.5 0 0 1 4.5 7Z" />
-                  )}
-                </svg>
-              </button>
-            </>
+            <HistoryMenu
+              label={run.savedAt ? `Prepared ${timeAgo(run.savedAt)}` : `Prepared in ${run.seconds?.toFixed(1)}s`}
+              items={history}
+              currentId={run.briefingId}
+              onOpen={onOpenVersion}
+            />
           )}
-          {run.status !== 'idle' && !(run.status === 'done' && run.stale && view === 'briefing') && (
+          {run.status === 'running' && (
+            <span className="inline-flex h-9 items-center gap-2 px-2 text-[13px] text-slate-600">
+              <Spinner className="h-3.5 w-3.5" /> Preparing · {done} of 7
+            </span>
+          )}
+          {run.status === 'done' && !run.stale && view === 'briefing' && (
             <button
               onClick={onPrepare}
-              disabled={run.status === 'running'}
-              className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:ring-slate-300 disabled:opacity-60"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
             >
-              {run.status === 'running' && <Spinner className="h-3.5 w-3.5" />}
-              {run.status === 'running' ? `${done} of 7` : 'Regenerate'}
+              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M20 11a8 8 0 1 0-2.3 5.7" />
+                <path d="M20 4v7h-7" />
+              </svg>
+              Regenerate
             </button>
           )}
         </div>
       </div>
 
       {run.status === 'done' && run.stale && view === 'briefing' && (
-        <div
-          role="status"
-          className="mt-4 flex items-center gap-3 rounded-xl bg-amber-50/80 px-4 py-2.5 text-[13px] text-amber-900 ring-1 ring-amber-200"
-        >
-          <svg viewBox="0 0 20 20" className="h-4 w-4 shrink-0 text-amber-500" fill="currentColor" aria-hidden="true">
-            <path
-              fillRule="evenodd"
-              d="M8.49 2.86c.67-1.15 2.35-1.15 3.02 0l6.28 10.88c.67 1.15-.17 2.6-1.51 2.6H3.72c-1.34 0-2.18-1.45-1.51-2.6L8.49 2.86ZM10 6a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 6Zm0 8a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"
-            />
+        <div role="status" className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl border border-amber-200 bg-amber-50 py-3 pl-4 pr-3">
+          <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0 text-amber-700" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M12 3l9.5 17h-19z" />
+            <path d="M12 10v4" />
+            <path d="M12 17.5v.01" />
           </svg>
-          <span className="flex-1">
-            <span className="font-semibold">Source data changed since this was prepared.</span> Regenerate to use the
+          <p className="flex-[1_1_280px] text-[14px] leading-snug text-amber-900">
+            <strong className="font-semibold">Source data changed since this was prepared.</strong> Regenerate to use the
             latest records.
-          </span>
+          </p>
           <button
             onClick={onPrepare}
-            className="rounded-full bg-amber-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-amber-500"
+            className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-slate-900 px-4 text-[14px] font-semibold text-white transition hover:bg-slate-800"
           >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M20 11a8 8 0 1 0-2.3 5.7" />
+              <path d="M20 4v7h-7" />
+            </svg>
             Regenerate
           </button>
         </div>
@@ -566,11 +581,14 @@ function MeetingHeader({
 
 function IdleState({ onPrepare }: { onPrepare: () => void }) {
   return (
-    <div className="grid place-items-center rounded-2xl bg-white py-20 shadow-[0_12px_32px_-16px_rgba(15,23,42,0.12)] ring-1 ring-slate-900/[0.04]">
+    <div className={cn(CARD, 'grid place-items-center px-6 py-16 text-center')}>
       <Logo size={44} />
+      <p className="mt-4 max-w-sm text-[14px] text-slate-600">
+        Seven sections, every sentence cited and checked against its source. About ten seconds.
+      </p>
       <button
         onClick={onPrepare}
-        className="mt-6 rounded-full bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white shadow-lg shadow-indigo-600/20 transition hover:bg-indigo-500"
+        className="mt-5 inline-flex h-11 items-center gap-2 rounded-[10px] bg-slate-900 px-5 text-[14px] font-semibold text-white transition hover:bg-slate-800"
       >
         Prepare briefing
       </button>
@@ -617,39 +635,6 @@ function toMarkdown(b: Briefing, reviews: Record<string, Review>, reviewer: stri
   return lines.join('\n')
 }
 
-/** UI-6: how much of the briefing a person has checked. A ring that fills, emerald when complete. */
-function ReviewProgress({ reviewed, total }: { reviewed: number; total: number }) {
-  if (total === 0) return null
-  const complete = reviewed === total
-  const r = 7
-  const length = 2 * Math.PI * r
-  return (
-    <span
-      title={`${reviewed} of ${total} claims reviewed (accepted or rejected)`}
-      className={cn(
-        'inline-flex items-center gap-1.5 text-xs font-medium tabular-nums',
-        complete ? 'text-emerald-700' : 'text-slate-500',
-      )}
-    >
-      <svg viewBox="0 0 18 18" className="h-4 w-4 -rotate-90">
-        <circle cx="9" cy="9" r={r} fill="none" stroke="currentColor" strokeWidth="2" className="text-slate-200" />
-        <circle
-          cx="9"
-          cy="9"
-          r={r}
-          fill="none"
-          strokeWidth="2"
-          strokeLinecap="round"
-          className={complete ? 'stroke-emerald-500' : 'stroke-indigo-500'}
-          strokeDasharray={length}
-          strokeDashoffset={length * (1 - reviewed / total)}
-        />
-      </svg>
-      {complete ? 'Reviewed' : `${reviewed}/${total}`}
-    </span>
-  )
-}
-
 /** Who is in the room, with titles and a "New" tag from the contacts table once the briefing starts. */
 function Attendees({ names, contacts }: { names: string[]; contacts: Exhibits['contacts'] }) {
   if (names.length === 0) return null
@@ -677,12 +662,3 @@ function Attendees({ names, contacts }: { names: string[]; contacts: Exhibits['c
   )
 }
 
-/** "Chief Financial Officer" -> "CFO"; other titles unchanged. */
-function shortTitle(title: string): string {
-  const known: Record<string, string> = {
-    'chief executive officer': 'CEO',
-    'chief financial officer': 'CFO',
-    'chief operating officer': 'COO',
-  }
-  return known[title.toLowerCase()] ?? title
-}

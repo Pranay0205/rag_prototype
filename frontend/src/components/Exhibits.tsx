@@ -30,7 +30,10 @@ const CONTACT_TAG = {
 export function ContactsExhibit({ exhibits, onCite }: { exhibits: Exhibits; onCite: (c: Citation) => void }) {
   if (exhibits.contacts.length === 0) return null
   return (
-    <div className="mb-3 overflow-hidden rounded-xl ring-1 ring-slate-100">
+    <div className="mb-3 overflow-hidden rounded-xl border border-slate-100">
+      <h3 className="border-b border-slate-100 bg-slate-50 px-4 py-2.5 text-[12px] font-semibold uppercase tracking-wider text-slate-600">
+        Client contacts
+      </h3>
       {exhibits.contacts.map((c) => (
         <ContactLine key={c.name} contact={c} onCite={onCite} />
       ))}
