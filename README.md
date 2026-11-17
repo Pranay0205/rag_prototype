@@ -88,7 +88,8 @@ Principles: numbers only from SQL, cite or omit, access enforced before retrieva
 document text is data and never instructions, deterministic wherever possible.
 
 **Read next:** the [design walkthrough](docs/DESIGN.md) (decisions, trade-offs, what evaluation
-changed, what production would need). Requirements live in [`specs/`](specs/00-overview.md); every
+changed, what production would need) and the [evaluation plan](docs/EVALUATION.md) (how it is proven
+safe to run, latest results, and where the evidence is still thin). Requirements live in [`specs/`](specs/00-overview.md); every
 requirement has an ID used in code and test names.
 
 **Stack:** Python 3.12, FastAPI, SQLite (FTS5 for keyword search, vectors stored alongside),
