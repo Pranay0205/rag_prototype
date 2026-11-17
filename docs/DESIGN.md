@@ -169,7 +169,7 @@ The briefing is designed to be read in a minute, not studied:
 - **Conflicts as "was → now"**: "Last briefing said ~$4.1M and growing → System record $3.4M, down
   18.1%". The outdated side stays visible on purpose: the team may still believe it.
 - **Before the meeting**: actions ordered by urgency, overdue items first with a day count.
-- **Ask chat**: a floating chat on every page; any further question goes through the same
+- **Ask chat**: opened from the briefing header or Home; any further question goes through the same
   retrieval and verification as a section, with citations and verification tags in the answer.
 - **Readable everywhere**: dates as "15 Oct 2026", amounts as "$3.4M", inline citations as small
   numbers that open the source with the sentence highlighted, or the database row itself.

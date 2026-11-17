@@ -60,8 +60,8 @@ cited sentence highlighted, source type, date and authority flags (derived, stal
 suspected injection). Structured sources show the database row itself (`Citation.record`) as a
 field table, named by table and record ID, with the sentence the model was given beneath it.
 
-**UI-5 Side rails – "Needs attention":** left: what to do before the meeting (actions by urgency,
-access notice). Every item shows where it came from (From records, From a conflict, Suggested by AI,
+**UI-5 Prep panel – "Needs attention":** one sticky panel beside the briefing with two tabs: To do
+(actions by urgency, access notice) and Conflicts (conflicts, then gaps). Every item shows where it came from (From records, From a conflict, Suggested by AI,
 From your notes, Added by you). Ticking saves an action and unticking removes it; "Add item" saves a
 typed one; saved actions reappear in the client's later briefings and ticked suggestions stay ticked; right: conflicts and gaps. Originally one right rail: conflicts (both values side by side + resolution),
 unknowns, `access_limited` notice ("Some sources are not available at your access level"),
@@ -80,16 +80,18 @@ who reviewed it and how many claims were checked and removed.
 
 **UI-10 Cost & latency footer:** tokens, cost (if provider reports it), generation time.
 
-**UI-11 Home:** after sign-in, three cards: Meetings (time, purpose, attendees, briefing ready or
-not), Companies (industry, our role, revenue TTM and YoY, aliases) and Facilities & maturities
-(notional, maturity, amber when within 12 months, utilization). Replaces the meeting sidebar.
+**UI-11 Home:** after sign-in: Next up (the next meeting, briefing ready or not, "Before you go in"
+chips: revenue trend, a facility maturing within 12 months, new key contacts); This week (meetings,
+one colour per client); Clients (revenue TTM and YoY, aliases); Facilities & maturities on a shared
+timeline with the next 12 months shaded. Replaces the meeting sidebar.
 
 **UI-12 Top bar:** brand (home) and the profile menu (switch profile, data health, sign out). A
 company search box was tried and removed: the home cards list every covered client, and the chat
 picks its client. API-13 remains available. Browser Back / Forward and reload follow the open
 meeting (`#/meeting/<id>`); the briefing page has a Home link.
 
-**UI-13 Ask chat:** a floating chat on every page (bottom right, clear of the attention panel on the left). Typing is never blocked. While
+**UI-13 Ask chat:** opened from "Ask about <client>" in the briefing header or "Ask about this client"
+on Home; the panel can switch client. Typing is never blocked. While
 the user types, the client named in the question is detected (API-13, aliases included) and shown
 ("About Northwind Logistics, from NWL"); otherwise the client on screen is used; with neither, the
 chat keeps the question and asks which client it is about. Suggested questions; each answer shows
