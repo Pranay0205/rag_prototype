@@ -1,5 +1,5 @@
 // Small shared presentational pieces.
-import { type ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 import type { Confidence, SectionKey } from '../types'
 
 export function cn(...classes: (string | false | null | undefined)[]): string {
@@ -196,6 +196,37 @@ export function VerifiedPill({ confidence, verified, total }: { confidence: Conf
       <span className={cn('h-2 w-2 rounded-full', tone[1])} />
       <span>{confidence.charAt(0).toUpperCase() + confidence.slice(1)} confidence</span>
       {total > 0 && <span className="opacity-70">· {verified}/{total} verified</span>}
+    </span>
+  )
+}
+
+/** An info icon beside a card title; its explanation shows on hover or keyboard focus. */
+export function InfoTip({ text, align = 'left' }: { text: string; align?: 'left' | 'right' }) {
+  const id = useId()
+  return (
+    <span className="group/info relative inline-flex">
+      <button
+        type="button"
+        aria-label="About this card"
+        aria-describedby={id}
+        className="grid h-5 w-5 place-items-center rounded-full text-slate-400 transition hover:text-slate-700 focus-visible:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+      >
+        <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+          <circle cx="10" cy="10" r="7.25" />
+          <path d="M10 9v4.5" strokeLinecap="round" />
+          <circle cx="10" cy="6.4" r="0.9" fill="currentColor" stroke="none" />
+        </svg>
+      </button>
+      <span
+        id={id}
+        role="tooltip"
+        className={cn(
+          'pointer-events-none invisible absolute top-full z-30 mt-2 w-72 rounded-lg bg-slate-900 px-3 py-2 text-[12.5px] font-normal leading-relaxed text-white opacity-0 shadow-lg transition group-focus-within/info:visible group-focus-within/info:opacity-100 group-hover/info:visible group-hover/info:opacity-100',
+          align === 'right' ? 'right-0' : 'left-0',
+        )}
+      >
+        {text}
+      </span>
     </span>
   )
 }

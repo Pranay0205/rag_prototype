@@ -2,7 +2,18 @@
 // call, so the page has real numbers within a second. Click a card to open the rows behind it.
 import { useEffect, useId, useState } from 'react'
 import type { Citation, KeyFigure } from '../types'
-import { CARD, cn } from './ui'
+import { CARD, InfoTip, cn } from './ui'
+
+// What each card shows, for the info icon in its corner
+const INFO: Record<string, string> = {
+  revenue:
+    'Revenue Meridian earned from this client over the last four reported quarters, compared with the four before. Calculated from the revenue records; select the card to see the working.',
+  facility:
+    "The client's largest credit facility: its size, when it matures and how much of it is drawn. A facility maturing within 12 months is the next refinancing conversation.",
+  pipeline:
+    'Estimated revenue from opportunities not yet won or lost, summed. Only opportunities you are cleared to see are included.',
+  actions: 'Commitments Meridian made to the client that are still open. Overdue means past the agreed due date.',
+}
 
 interface Props {
   figures: KeyFigure[]
@@ -46,50 +57,57 @@ function FigureCard({ figure, index, onCite }: { figure: KeyFigure; index: numbe
   const first = figure.citations[0]
   const delta = figure.key === 'revenue' && /^[+-]/.test(figure.detail)
   return (
-    <button
-      onClick={() => first && onCite(first)}
-      disabled={!first}
-      title={first ? 'Open the database rows behind this number' : undefined}
-      style={{ animationDelay: `${index * 70}ms` }}
-      className={cn(CARD, 'rise group relative flex min-h-[118px] flex-col overflow-hidden rounded-xl p-4 text-left transition duration-300 hover:border-slate-300')}
-    >
-      <span className="line-clamp-2 text-[13px] leading-tight text-slate-600">{figure.label}</span>
-
-      <div className="mt-2 text-[26px] font-bold leading-none tracking-tight text-slate-900 tabular-nums">
-        <CountUp value={figure.value} />
-      </div>
-
-      {/* warnings read as pills (matures soon, overdue); trends as coloured text */}
-      <div
-        className={cn(
-          'mt-2 flex items-start gap-1 text-[13px] font-medium leading-snug',
-          !delta && (figure.tone === 'warn' || figure.tone === 'bad')
-            ? cn('self-start rounded-full px-2 py-0.5 text-[12px] font-semibold', figure.tone === 'warn' ? 'bg-amber-50 text-amber-800' : 'bg-rose-50 text-rose-800')
-            : tone.text,
-        )}
+    <div className="relative">
+      <button
+        onClick={() => first && onCite(first)}
+        disabled={!first}
+        title={first ? 'Open the database rows behind this number' : undefined}
+        style={{ animationDelay: `${index * 70}ms` }}
+        className={cn(CARD, 'rise group relative flex h-full min-h-[118px] w-full flex-col overflow-hidden rounded-xl p-4 pr-10 text-left transition duration-300 hover:border-slate-300')}
       >
-        {delta && (
-          <svg viewBox="0 0 20 20" className="mt-px h-3.5 w-3.5 shrink-0" fill="currentColor" aria-hidden="true">
-            {figure.detail.startsWith('-') ? <path d="M10 15 4 7h12l-6 8Z" /> : <path d="M10 5l6 8H4l6-8Z" />}
-          </svg>
-        )}
-        <span>{delta ? figure.detail.replace(/^[+-]/, '') : figure.detail}</span>
-      </div>
-
-      {figure.bar_pct !== null && (
-        <div className="mt-auto flex items-center gap-2 pt-3" role="img" aria-label={`${figure.bar_pct}% utilized`}>
-          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
-            <div
-              className="grow-x h-full rounded-full bg-indigo-500"
-              style={{ width: `${Math.min(100, figure.bar_pct)}%` }}
-            />
-          </div>
-          <span className="text-[11px] font-medium tabular-nums text-slate-500">{figure.bar_pct}% used</span>
+        <span className="line-clamp-2 text-[13px] leading-tight text-slate-600">{figure.label}</span>
+  
+        <div className="mt-2 text-[26px] font-bold leading-none tracking-tight text-slate-900 tabular-nums">
+          <CountUp value={figure.value} />
         </div>
+  
+        {/* warnings read as pills (matures soon, overdue); trends as coloured text */}
+        <div
+          className={cn(
+            'mt-2 flex items-start gap-1 text-[13px] font-medium leading-snug',
+            !delta && (figure.tone === 'warn' || figure.tone === 'bad')
+              ? cn('self-start rounded-full px-2 py-0.5 text-[12px] font-semibold', figure.tone === 'warn' ? 'bg-amber-50 text-amber-800' : 'bg-rose-50 text-rose-800')
+              : tone.text,
+          )}
+        >
+          {delta && (
+            <svg viewBox="0 0 20 20" className="mt-px h-3.5 w-3.5 shrink-0" fill="currentColor" aria-hidden="true">
+              {figure.detail.startsWith('-') ? <path d="M10 15 4 7h12l-6 8Z" /> : <path d="M10 5l6 8H4l6-8Z" />}
+            </svg>
+          )}
+          <span>{delta ? figure.detail.replace(/^[+-]/, '') : figure.detail}</span>
+        </div>
+  
+        {figure.bar_pct !== null && (
+          <div className="mt-auto flex items-center gap-2 pt-3" role="img" aria-label={`${figure.bar_pct}% utilized`}>
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+              <div
+                className="grow-x h-full rounded-full bg-indigo-500"
+                style={{ width: `${Math.min(100, figure.bar_pct)}%` }}
+              />
+            </div>
+            <span className="text-[11px] font-medium tabular-nums text-slate-500">{figure.bar_pct}% used</span>
+          </div>
+        )}
+  
+        {figure.trend.length > 1 && <Sparkline points={figure.trend} color={tone.stroke} />}
+      </button>
+        {INFO[figure.key] && (
+        <span className="absolute right-3 top-3.5">
+          <InfoTip text={INFO[figure.key]} align="right" />
+        </span>
       )}
-
-      {figure.trend.length > 1 && <Sparkline points={figure.trend} color={tone.stroke} />}
-    </button>
+      </div>
   )
 }
 
