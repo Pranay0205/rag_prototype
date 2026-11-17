@@ -52,8 +52,8 @@ A five-minute tour:
    highlighted, or the database row itself.
 3. **Look at the prep panel on the right.** Under To do, the overdue proposal is on top. Under Conflicts, "Changed" cards show what the
    last briefing said ($4.1M and growing, Dana Whitfield as CFO) next to what is true now.
-4. **Click "Ask about Northwind"** in the briefing header (or "Ask about this client" on Home) and ask
-   anything. Answers are cited and verified like the briefing.
+4. **Click the "Ask anything about Northwind" bar** at the bottom of the page (or "Ask about Northwind"
+   in the header) and ask anything. Answers are cited and verified like the briefing.
 5. **Switch to Sam, then to Kim, and open Helios.** Kim sees the Aurora mandate. Sam does not, and
    nothing on Sam's page names it (only a general "some sources are restricted" notice).
 6. **Back on Home**, Companies lists each client with its aliases ("NWL" is Northwind), revenue

@@ -107,13 +107,29 @@ export function ChatWidget({ userId, clients, currentClientId, open, onOpenChang
     }
   }
 
-  if (!open) return null
+  if (!open) {
+    // a hovering ask bar at the bottom of every page; the panel opens in the same place
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="fixed bottom-5 left-1/2 z-30 flex w-[min(560px,calc(100vw-48px))] -translate-x-1/2 items-center gap-3 rounded-full border border-slate-200 bg-white/95 py-2 pl-2 pr-5 text-left shadow-[0_12px_32px_-12px_rgba(26,24,20,0.35)] backdrop-blur transition hover:-translate-y-0.5 hover:border-slate-300"
+      >
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-900 text-white">
+          <ChatIcon className="h-4.5 w-4.5" />
+        </span>
+        <span className="flex-1 truncate text-[14px] text-slate-500">
+          {client ? `Ask anything about ${shortName(client.name)}` : 'Ask about any client you cover'}
+        </span>
+        <span className="text-[12px] font-medium text-slate-400">Cited answers</span>
+      </button>
+    )
+  }
 
   return (
     <section
       role="dialog"
       aria-label="Ask about a client"
-      className="rise fixed bottom-6 right-6 z-30 flex h-[620px] max-h-[calc(100vh-7rem)] w-[420px] flex-col overflow-hidden rounded-2xl bg-white shadow-[0_24px_64px_-12px_rgba(15,23,42,0.35)] ring-1 ring-slate-900/10"
+      className="rise fixed bottom-5 left-1/2 z-30 flex h-[620px] max-h-[calc(100vh-7rem)] w-[min(560px,calc(100vw-48px))] -translate-x-1/2 flex-col overflow-hidden rounded-2xl bg-white shadow-[0_24px_64px_-12px_rgba(15,23,42,0.35)] ring-1 ring-slate-900/10"
     >
       <header className="flex items-center gap-3 bg-slate-900 px-4 py-3.5 text-white">
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/15 text-[13px] font-semibold ring-1 ring-white/20">

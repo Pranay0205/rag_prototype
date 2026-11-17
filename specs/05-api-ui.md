@@ -92,8 +92,8 @@ company search box was tried and removed: the home cards list every covered clie
 picks its client. API-13 remains available. Browser Back / Forward and reload follow the open
 meeting (`#/meeting/<id>`); the briefing page has a Home link.
 
-**UI-13 Ask chat:** opened from "Ask about <client>" in the briefing header or "Ask about this client"
-on Home; the panel can switch client. Typing is never blocked. While
+**UI-13 Ask chat:** a hovering ask bar at the bottom centre of every page, plus "Ask about <client>" in the
+briefing header and "Ask about this client" on Home; the panel opens in place and can switch client. Typing is never blocked. While
 the user types, the client named in the question is detected (API-13, aliases included) and shown
 ("About Northwind Logistics, from NWL"); otherwise the client on screen is used; with neither, the
 chat keeps the question and asks which client it is about. Suggested questions; each answer shows

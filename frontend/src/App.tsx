@@ -338,7 +338,7 @@ export default function App() {
         {meeting && (
           <div
             className={cn(
-              'mx-auto px-6 py-8',
+              'mx-auto px-6 pb-28 pt-8', // pb-28: room above the hovering ask bar
               rails ? 'flex max-w-[1320px] flex-wrap items-start gap-8 min-[1600px]:max-w-[1640px]' : 'max-w-3xl',
             )}
           >

@@ -50,7 +50,7 @@ export function HomeDashboard({ userId, name, onOpenMeeting, onOpenClient, onAsk
   const soon = data.facilities.filter((f) => f.matures_within_12m).length
   const next = data.meetings[0]
   return (
-    <div className="mx-auto flex max-w-[1200px] flex-col gap-8 px-6 pb-16 pt-10">
+    <div className="mx-auto flex max-w-[1200px] flex-col gap-8 px-6 pb-28 pt-10">
       <div className="rise">
         <h1 className="text-[30px] font-bold leading-tight tracking-tight">
           {greeting()}, {name}
